@@ -34,7 +34,15 @@ export const drawSetups = (
 
         ctx.fillStyle = bg;
         ctx.beginPath();
-        ctx.roundRect(drawX, y - bgH/2, bgW, bgH, 3);
+        
+        // Fix for roundRect TypeScript error / Browser compatibility
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(drawX, y - bgH/2, bgW, bgH, 3);
+        } else {
+            // Fallback for older browsers
+            ctx.rect(drawX, y - bgH/2, bgW, bgH);
+        }
+        
         ctx.fill();
         
         ctx.fillStyle = color;

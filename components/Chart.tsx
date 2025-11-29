@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
     createChart, 
     CandlestickSeries,
@@ -9,10 +9,12 @@ import {
     SeriesMarker, 
     Time,
     HistogramSeries,
-    IPriceLine
+    IPriceLine,
+    CrosshairMode
 } from 'lightweight-charts';
 import { CandleData, EntrySignal, FVG, OrderBlock, OverlayState, StructurePoint, TradeEntry, ColorTheme } from '../types';
 import { drawCanvasLayer } from '../services/chartOverlay';
+import { ChartControls } from './ChartControls';
 
 interface ChartProps {
     data: CandleData[];
@@ -29,9 +31,11 @@ interface ChartProps {
     position: TradeEntry | null;
     htfObs: OrderBlock[];
     htfFvgs: FVG[];
-    // New Props for Toggle controls
     setOverlays: (o: OverlayState) => void;
     onReload: () => void;
+    setupVisibility: 'ALL' | 'FOCUS' | 'NONE';
+    setSetupVisibility: (mode: 'ALL' | 'FOCUS' | 'NONE') => void;
+    focusedEntry: EntrySignal | null;
 }
 
 export const ChartComponent: React.FC<ChartProps> = (props) => {
@@ -44,6 +48,28 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     const activeTradeLinesRef = useRef<IPriceLine[]>([]);
     const mousePos = useRef<{ x: number, y: number } | null>(null);
     const drawCanvasOverlayRef = useRef<() => void>(() => {});
+
+    // Filtered Entries based on Visibility Mode
+    const visibleEntries = useMemo(() => {
+        if (props.setupVisibility === 'NONE') return [];
+        if (props.setupVisibility === 'FOCUS' && props.focusedEntry) return [props.focusedEntry];
+        return props.entries;
+    }, [props.entries, props.setupVisibility, props.focusedEntry]);
+
+    // Zoom to focused entry effect
+    useEffect(() => {
+        if (props.setupVisibility === 'FOCUS' && props.focusedEntry && chartRef.current && props.data.length > 0) {
+            const ts = chartRef.current.timeScale();
+            const entryTime = props.focusedEntry.time as number;
+            const index = props.data.findIndex(d => d.time === entryTime);
+            if (index !== -1) {
+                // Zoom to +/- 30 candles around entry
+                const fromIndex = Math.max(0, index - 30);
+                const toIndex = Math.min(props.data.length - 1, index + 30);
+                ts.setVisibleLogicalRange({ from: fromIndex, to: toIndex });
+            }
+        }
+    }, [props.focusedEntry, props.setupVisibility]); 
 
     // Initialize Chart
     useEffect(() => {
@@ -67,6 +93,14 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             timeScale: { timeVisible: true, secondsVisible: false },
             rightPriceScale: { visible: true, borderColor: '#2B2B43' },
             leftPriceScale: { visible: false, borderColor: '#2B2B43' },
+            crosshair: {
+                mode: CrosshairMode.Normal,
+                vertLine: { labelBackgroundColor: '#2962FF' },
+                horzLine: { labelBackgroundColor: '#2962FF' },
+            },
+            handleScale: { pinch: true, mouseWheel: true, axisPressedMouseMove: true },
+            handleScroll: { vertTouchDrag: false, horzTouchDrag: true, pressedMouseMove: true, mouseWheel: true },
+            kineticScroll: { touch: true, mouse: true }
         });
 
         const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -95,41 +129,30 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         window.addEventListener('resize', handleResize);
         
         chart.subscribeCrosshairMove(param => {
-            if (param.point) {
-                mousePos.current = param.point;
-            } else {
-                mousePos.current = null;
-            }
-            
-            if (drawCanvasOverlayRef.current) {
-                requestAnimationFrame(drawCanvasOverlayRef.current);
-            }
-
-            if (param.time && props.entries.length > 0) {
-                const e = props.entries.find((x: any) => Math.abs(x.time - (param.time as number)) < 300);
+            if (param.point) mousePos.current = param.point;
+            else mousePos.current = null;
+            if (drawCanvasOverlayRef.current) requestAnimationFrame(drawCanvasOverlayRef.current);
+            if (param.time && visibleEntries.length > 0) {
+                const e = visibleEntries.find((x: any) => Math.abs(x.time - (param.time as number)) < 300);
                 props.onHoverEntry(e || null);
             } else props.onHoverEntry(null);
         });
         
         chart.subscribeClick(param => {
             if (param.time) {
-                const e = props.entries.find((x: any) => x.time === param.time);
+                const e = visibleEntries.find((x: any) => x.time === param.time);
                 if (e) props.onClickEntry(e);
             }
         });
 
         chart.timeScale().subscribeVisibleTimeRangeChange(() => {
-            if (drawCanvasOverlayRef.current) {
-                requestAnimationFrame(drawCanvasOverlayRef.current);
-            }
+            if (drawCanvasOverlayRef.current) requestAnimationFrame(drawCanvasOverlayRef.current);
         });
 
         return () => {
             window.removeEventListener('resize', handleResize);
             if (chartRef.current) {
-                try {
-                    chartRef.current.remove();
-                } catch(e) {}
+                try { chartRef.current.remove(); } catch(e) {}
                 chartRef.current = null;
                 candleSeriesRef.current = null;
             }
@@ -152,7 +175,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     useEffect(() => {
         if (candleSeriesRef.current && props.data.length > 0) {
              const coloredData = props.data.map((d: any) => {
-                const isEntry = props.entries.find((e: any) => e.time === d.time);
+                const isEntry = visibleEntries.find((e: any) => e.time === d.time);
                 const hour = new Date(d.time * 1000).getUTCHours();
                 const isSB = (hour === 14 || hour === 9 || hour === 3);
                 let color = undefined; let borderColor = undefined;
@@ -162,7 +185,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             });
             candleSeriesRef.current.setData(coloredData);
         }
-    }, [props.data, props.entries, props.overlays]);
+    }, [props.data, visibleEntries, props.overlays]);
 
     // Update Sessions & Macro
     useEffect(() => {
@@ -194,19 +217,14 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     // Update Markers & Trade Lines (Active Position Only)
     useEffect(() => {
         if (!candleSeriesRef.current) return;
-        
         try {
              activeTradeLinesRef.current.forEach(l => candleSeriesRef.current?.removePriceLine(l));
              activeTradeLinesRef.current = [];
-             
-             // Removed historicalTradeLinesRef logic as it is now handled by Canvas Layer
-
             if (props.position) {
                 activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.price, color: '#2962FF', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'ENTRY' }));
                 if (props.position.stopLoss) activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.stopLoss, color: '#ef5350', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'SL' }));
                 if (props.position.takeProfit) activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.takeProfit, color: '#00E676', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'TP' }));
             }
-
             const markers: SeriesMarker<Time>[] = [];
             if (props.overlays.swingStructure) {
                 props.structure.forEach((s: any) => {
@@ -217,29 +235,23 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             if (props.overlays.internalStructure) {
                  props.structure.forEach((s: any) => {
                      if (['BOS','CHoCH'].includes(s.type))
-                    // @ts-ignore
+                        // @ts-ignore
                         markers.push({ time: s.time, position: s.type.includes('BOS') ? (s.direction==='Bullish'?'belowBar':'aboveBar') : 'aboveBar', color: s.type==='BOS'?'#2962FF':'#E040FB', shape: 'none', text: s.type });
                 });
             }
             if (props.overlays.backtestMarkers) {
-                props.entries.forEach((e: any) => {
+                visibleEntries.forEach((e: any) => {
                     const grade = e.setupGrade ? `[${e.setupGrade}] ` : '';
                     // @ts-ignore
                     markers.push({ time: e.time, position: e.type==='LONG'?'belowBar':'aboveBar', color: e.type==='LONG'?'#00E676':'#FF1744', shape: e.type==='LONG'?'arrowUp':'arrowDown', text: `${grade}${e.type}` });
                 });
             }
-            
-            const series: any = candleSeriesRef.current;
-            if (series && typeof series.setMarkers === 'function') {
-                series.setMarkers(markers);
-            }
+            // @ts-ignore
+            if (candleSeriesRef.current.setMarkers) candleSeriesRef.current.setMarkers(markers);
 
-        } catch (err) {
-            console.warn("Error updating chart markers/lines:", err);
-        }
-
+        } catch (err) { console.warn("Error updating chart markers/lines:", err); }
         requestAnimationFrame(drawCanvasOverlay);
-    }, [props.position, props.structure, props.entries, props.overlays, props.data]);
+    }, [props.position, props.structure, visibleEntries, props.overlays, props.data]);
 
     // Canvas Overlay Drawing
     const drawCanvasOverlay = useCallback(() => {
@@ -263,25 +275,10 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         
         const timeScale = chart.timeScale();
 
-        // Delegate drawing to the service
         drawCanvasLayer(
-            ctx, 
-            timeScale, 
-            series, 
-            props.data, 
-            props.obs, 
-            props.fvgs, 
-            props.entries, 
-            props.overlays, 
-            props.colors, 
-            props.pdRange, 
-            container.clientWidth, 
-            container.clientHeight,
-            props.htfObs,
-            props.htfFvgs
+            ctx, timeScale, series, props.data, props.obs, props.fvgs, visibleEntries, props.overlays, props.colors, props.pdRange, container.clientWidth, container.clientHeight, props.htfObs, props.htfFvgs
         );
-
-    }, [props.data, props.obs, props.fvgs, props.htfObs, props.htfFvgs, props.entries, props.pdRange, props.overlays, props.colors]);
+    }, [props.data, props.obs, props.fvgs, props.htfObs, props.htfFvgs, visibleEntries, props.pdRange, props.overlays, props.colors]);
 
     useEffect(() => {
         drawCanvasOverlayRef.current = drawCanvasOverlay;
@@ -299,34 +296,13 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 <button onClick={() => handleZoom(1.2)} className="bg-gray-800 text-white p-3 rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 opacity-80">-</button>
             </div>
 
-            {/* Top Toolbar for Overlays and Reload */}
-            <div className="absolute top-4 right-16 z-20 flex items-center gap-2">
-                 <button 
-                    onClick={() => {
-                        props.setOverlays({...props.overlays, historicalTradeLines: !props.overlays.historicalTradeLines});
-                        if (props.onReload) props.onReload(); // Trigger redraw/recalc if needed
-                    }}
-                    className={`p-2 rounded text-xs font-bold border transition-colors backdrop-blur-sm shadow-sm
-                        ${props.overlays.historicalTradeLines ? 'bg-blue-600/80 border-blue-400 text-white' : 'bg-gray-800/80 border-gray-600 text-gray-400'}
-                    `}
-                >
-                    {props.overlays.historicalTradeLines ? 'SETUPS ON' : 'SETUPS OFF'}
-                </button>
-                <button 
-                    onClick={props.onToggleOverlay} 
-                    className={`p-2 rounded text-xs font-bold border transition-colors backdrop-blur-sm shadow-sm
-                         ${props.overlays.killzones ? 'bg-purple-600/80 border-purple-400 text-white' : 'bg-gray-800/80 border-gray-600 text-gray-400'}
-                    `}
-                >
-                    {props.overlays.killzones ? 'SESSIONS' : 'SESSIONS'}
-                </button>
-                <button 
-                    onClick={props.onReload} 
-                    className="p-2 rounded text-xs font-bold bg-gray-700/80 hover:bg-gray-600/80 text-white border border-gray-500 backdrop-blur-sm transition-colors flex items-center gap-1"
-                >
-                    <span>↻</span> RELOAD
-                </button>
-            </div>
+            <ChartControls 
+                overlays={props.overlays} 
+                setOverlays={props.setOverlays}
+                setupVisibility={props.setupVisibility}
+                setSetupVisibility={props.setSetupVisibility}
+                onReload={props.onReload}
+            />
         </div>
     );
 };

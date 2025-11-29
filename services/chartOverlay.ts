@@ -1,6 +1,7 @@
 
 import { ISeriesApi, ITimeScaleApi, Time } from "lightweight-charts";
 import { CandleData, EntrySignal, FVG, OrderBlock, OverlayState, ColorTheme, UTCTimestamp } from "../types";
+import { drawSetups } from "./drawSetups";
 
 export const drawCanvasLayer = (
     ctx: CanvasRenderingContext2D,
@@ -21,32 +22,6 @@ export const drawCanvasLayer = (
     // Clear Canvas
     ctx.clearRect(0, 0, width, height);
     
-    // Helper to draw text with background
-    const drawLabel = (text: string, x: number, y: number, color: string, align: 'left' | 'right' | 'center' = 'left') => {
-        ctx.font = 'bold 10px Inter, sans-serif';
-        const metrics = ctx.measureText(text);
-        const pad = 4;
-        const bgW = metrics.width + pad * 2;
-        const bgH = 14;
-        
-        let drawX = x;
-        if (align === 'right') drawX = x - bgW;
-        if (align === 'center') drawX = x - bgW / 2;
-
-        ctx.fillStyle = color;
-        // Rounded rect for label
-        const r = 3;
-        
-        ctx.beginPath();
-        ctx.roundRect(drawX, y - bgH/2, bgW, bgH, r);
-        ctx.fill();
-        
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, drawX + pad, y);
-    };
-
     // --- 1. PD ZONES ---
     if (overlays.pdZones && pdRange) {
         const yH = series.priceToCoordinate(pdRange.high);
@@ -136,130 +111,8 @@ export const drawCanvasLayer = (
     }
 
     // --- 4. TRADE SETUPS (ENTRY/SL/TP BOXES) ---
-    if (overlays.historicalTradeLines && data.length > 0) {
-        const lastCandleTime = data[data.length - 1].time;
-
-        entries.forEach(entry => {
-            // Only draw visible setups or recent ones
-            const isLong = entry.type === 'LONG';
-            
-            // @ts-ignore
-            const x1 = timeScale.timeToCoordinate(entry.time);
-            
-            // Calculate end coordinate
-            // If exitTime exists, use it. If not, trade is OPEN, extend to right edge or near future
-            let x2 = width;
-            let isActive = false;
-            
-            if (entry.exitTime) {
-                // @ts-ignore
-                const exitCoord = timeScale.timeToCoordinate(entry.exitTime);
-                if (exitCoord !== null) {
-                    x2 = exitCoord;
-                } else {
-                    // Exit time might be off screen to the right? Or not loaded?
-                    // If exit time is later than last candle, it's weird, but handle it
-                }
-            } else {
-                // Pending/Active trade
-                isActive = true;
-                x2 = width - 80; // Leave margin
-            }
-            
-            // Skip if completely off screen to the left or right
-            if (x1 === null && x2 < 0) return;
-            // Note: x1 can be null if start is offscreen left, but setup continues onscreen.
-            const startX = x1 !== null ? x1 : -100; 
-
-            // Prevent drawing massive historical boxes if zoomed in far away from them
-            // if (x2 < 0) return; 
-            
-            const boxWidth = Math.max(x2 - startX, 40); // Minimum width
-
-            const yEntry = series.priceToCoordinate(entry.price);
-            const ySL = series.priceToCoordinate(entry.sl);
-            const yTP = series.priceToCoordinate(entry.tp);
-
-            if (yEntry === null || ySL === null || yTP === null) return;
-
-            // Colors
-            const winColor = 'rgba(14, 203, 129, '; // Green
-            const lossColor = 'rgba(246, 70, 93, '; // Red
-            
-            // For a Long Position:
-            // TP is above Entry (Profit Zone) -> Green
-            // SL is below Entry (Loss Zone) -> Red
-            
-            const tpFill = isLong ? winColor + '0.12)' : winColor + '0.12)';
-            const tpStroke = isLong ? winColor + '0.5)' : winColor + '0.5)';
-            
-            const slFill = isLong ? lossColor + '0.12)' : lossColor + '0.12)';
-            const slStroke = isLong ? lossColor + '0.5)' : lossColor + '0.5)';
-
-            // Draw TP Box
-            const hTP = yTP - yEntry; // Height from entry to TP
-            ctx.fillStyle = tpFill;
-            ctx.strokeStyle = tpStroke;
-            ctx.lineWidth = 1;
-            ctx.fillRect(startX, yEntry, boxWidth, hTP);
-            ctx.strokeRect(startX, yEntry, boxWidth, hTP);
-            
-            // Draw SL Box
-            const hSL = ySL - yEntry; // Height from entry to SL
-            ctx.fillStyle = slFill;
-            ctx.strokeStyle = slStroke;
-            ctx.fillRect(startX, yEntry, boxWidth, hSL);
-            ctx.strokeRect(startX, yEntry, boxWidth, hSL);
-
-            // Entry Line (Neutral)
-            ctx.beginPath();
-            ctx.moveTo(startX, yEntry);
-            ctx.lineTo(startX + boxWidth, yEntry);
-            ctx.strokeStyle = '#78909c';
-            ctx.setLineDash([3, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Draw connecting vertical line at Start
-            ctx.beginPath();
-            ctx.moveTo(startX, ySL);
-            ctx.lineTo(startX, yTP);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Text Labels (Only if width is sufficient)
-            if (boxWidth > 50 || isActive) {
-                // R:R Label in middle
-                const risk = Math.abs(entry.price - entry.sl);
-                const reward = Math.abs(entry.price - entry.tp);
-                const rr = reward / (risk || 1);
-                
-                // Draw Pill for RR
-                const rrText = `${rr.toFixed(1)}`;
-                drawLabel(rrText, startX + boxWidth/2, yEntry, '#555555', 'center');
-
-                // TP Label
-                if (Math.abs(hTP) > 15) {
-                    const tpPct = (reward / entry.price) * 100;
-                    drawLabel(`TP: ${tpPct.toFixed(2)}%`, startX + boxWidth/2, yTP + (isLong ? 10 : -10), winColor+'0.8)', 'center');
-                }
-
-                // SL Label
-                if (Math.abs(hSL) > 15) {
-                    const slPct = (risk / entry.price) * 100;
-                    drawLabel(`SL: ${slPct.toFixed(2)}%`, startX + boxWidth/2, ySL + (isLong ? -10 : 10), lossColor+'0.8)', 'center');
-                }
-            }
-            
-            // Result Icon at end of box if closed
-            if (!isActive && x2 > 0 && x2 < width) {
-                const isWin = entry.backtestResult === 'WIN';
-                ctx.font = '16px serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(isWin ? '✅' : '❌', x2, yEntry);
-            }
-        });
+    // Delegate to dedicated drawing function
+    if (overlays.historicalTradeLines) {
+        drawSetups(ctx, timeScale, series, data, entries, true, width);
     }
 };

@@ -3,7 +3,6 @@ import React from 'react';
 import { AppConfig, BacktestStats, ColorTheme, EntrySignal, OrderBlock, OverlayState, StructurePoint, TradeEntry, SimulationConfig } from '../types';
 import { ScannerPanel } from './panels/ScannerPanel';
 import { TradingPanel } from './panels/TradingPanel';
-import { DashboardPanel } from './panels/DashboardPanel';
 import { StatsPanel } from './panels/StatsPanel';
 import { SetupsPanel } from './panels/SetupsPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
@@ -33,11 +32,12 @@ interface PanelProps {
     setSimulation: React.Dispatch<React.SetStateAction<SimulationConfig>>;
     onDeepScan: () => void;
     isScanning: boolean;
+    onFocusEntry?: (e: EntrySignal) => void;
 }
 
 export const Panels: React.FC<PanelProps> = (props) => {
     // If on chart or empty, show nothing in the panel container
-    if (props.activeTab === 'CHART' || !props.activeTab) return <div className="p-8 text-center text-gray-600 text-sm">Select a tool from the menu</div>;
+    if (props.activeTab === 'CHART' || props.activeTab === 'DASHBOARD' || !props.activeTab) return null;
 
     const commonProps = { onClose: () => props.setActiveTab('CHART') };
 
@@ -49,6 +49,7 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 setClickedEntry={props.setClickedEntry} 
                 onDeepScan={props.onDeepScan} 
                 isScanning={props.isScanning} 
+                onFocusEntry={props.onFocusEntry}
                 {...commonProps}
             />;
         case 'TRADING':
@@ -63,21 +64,15 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 autoTrade={props.autoTrade} setAutoTrade={props.setAutoTrade} 
                 {...commonProps}
             />;
-        case 'DASHBOARD':
-            return <DashboardPanel 
-                balance={props.balance} 
-                backtestStats={props.backtestStats} 
-                position={props.position} 
-                {...commonProps}
-            />;
         case 'STATS':
             return props.backtestStats ? <StatsPanel 
                 backtestStats={props.backtestStats} 
                 recentHistory={props.recentHistory} 
                 setClickedEntry={props.setClickedEntry} 
+                onFocusEntry={props.onFocusEntry}
                 {...commonProps}
             /> : <div className="p-4 text-center">Loading Stats...</div>;
-        case 'SETUPS': // Merged into scanner usually, but keeping if specific view needed
+        case 'SETUPS': 
             return <SetupsPanel 
                 obs={props.obs} 
                 data={props.data} 

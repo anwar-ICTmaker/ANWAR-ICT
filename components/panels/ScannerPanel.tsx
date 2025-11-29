@@ -9,9 +9,10 @@ interface ScannerPanelProps {
     onDeepScan?: () => void;
     isScanning?: boolean;
     onClose: () => void;
+    onFocusEntry?: (e: EntrySignal) => void;
 }
 
-export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning }) => {
+export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning, onFocusEntry }) => {
     return (
         <div className="h-full flex flex-col bg-[#151924]">
             <div className="p-4 border-b border-[#2a2e39] flex justify-between items-center shrink-0">
@@ -47,9 +48,9 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                     </div>
                     <div className="space-y-2">
                         {entries.slice(-10).reverse().map((entry, i) => (
-                            <div key={i} className="group p-3 bg-[#0b0e11] rounded border border-[#2a2e39] hover:border-blue-500 cursor-pointer transition-colors" onClick={() => setClickedEntry(entry)}>
+                            <div key={i} className="group p-3 bg-[#0b0e11] rounded border border-[#2a2e39] hover:border-blue-500 transition-colors">
                                 <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => setClickedEntry(entry)}>
                                         <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${entry.type === 'LONG' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
                                             {entry.type}
                                         </span>
@@ -57,11 +58,18 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                                             {new Date(entry.time as number * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                                         </span>
                                     </div>
-                                    <div className="bg-gray-800 text-[10px] text-gray-300 px-1 rounded">
-                                        Score: {entry.score}
+                                    <div className="flex items-center gap-2">
+                                        <div className="bg-gray-800 text-[10px] text-gray-300 px-1 rounded">
+                                            Score: {entry.score}
+                                        </div>
+                                        {onFocusEntry && (
+                                            <button onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} className="text-gray-500 hover:text-white p-1" title="View on Chart">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center cursor-pointer" onClick={() => setClickedEntry(entry)}>
                                     <span className="text-xs text-gray-300 font-medium truncate w-24" title={entry.setupName}>{entry.setupName || 'Standard Setup'}</span>
                                     {entry.setupGrade && <span className={`text-[10px] font-bold px-1 rounded ${entry.setupGrade.includes('A') ? 'text-yellow-400' : 'text-gray-500'}`}>{entry.setupGrade}</span>}
                                 </div>

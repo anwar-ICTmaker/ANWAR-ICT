@@ -7,6 +7,7 @@ import { performBacktest } from './services/backtest';
 import { ChartComponent } from './components/Chart';
 import { EntryDetailModal, TopSetupsModal, ToastNotification, ErrorBoundary } from './components/Modals';
 import { Panels } from './components/Panels';
+import { DashboardPanel } from './components/panels/DashboardPanel';
 
 // Icons
 const ChartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>;
@@ -14,6 +15,7 @@ const ListIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
 const TradeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
 const StatsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>;
+const DashboardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 
 const App: React.FC = () => {
     // --- STATE ---
@@ -28,7 +30,7 @@ const App: React.FC = () => {
     const [backtestStats, setBacktestStats] = useState<BacktestStats | null>(null);
     
     // UI State
-    const [activeTab, setActiveTab] = useState('SCANNER');
+    const [activeTab, setActiveTab] = useState('DASHBOARD');
     const [settingsTab, setSettingsTab] = useState('VISIBILITY'); 
     const [asset, setAsset] = useState('MGC (COMEX)');
     const [timeframe, setTimeframe] = useState('15m');
@@ -36,6 +38,10 @@ const App: React.FC = () => {
     const [clickedEntry, setClickedEntry] = useState<EntrySignal | null>(null);
     const [hoveredEntry, setHoveredEntry] = useState<EntrySignal | null>(null);
     const [isScanning, setIsScanning] = useState(false);
+
+    // Visibility & Focus State
+    const [setupVisibility, setSetupVisibility] = useState<'ALL'|'FOCUS'|'NONE'>('ALL');
+    const [focusedEntry, setFocusedEntry] = useState<EntrySignal | null>(null);
 
     // Configuration
     const [overlays, setOverlays] = useState({
@@ -131,10 +137,21 @@ const App: React.FC = () => {
         setTimeout(() => { setIsScanning(false); setAlert({ msg: "Deep Scan Complete: Adjusted probabilities", type: "success" }); }, 2000);
     };
 
+    const handleFocusEntry = (entry: EntrySignal) => {
+        setFocusedEntry(entry);
+        setSetupVisibility('FOCUS');
+        if (activeTab === 'DASHBOARD') setActiveTab('CHART');
+    };
+
     const thirtyDaysAgoTimestamp = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
     const recentHistory = entries.filter(e => e.backtestResult !== 'PENDING' && (e.time as number) > thirtyDaysAgoTimestamp);
     const isLowTf = ['1m', '3m'].includes(timeframe);
     const visibleFvgs = isLowTf ? [] : fvgs;
+
+    // --- LAYOUT LOGIC ---
+    const isDashboard = activeTab === 'DASHBOARD';
+    // Sidebar panels are active if tab is NOT Dashboard and NOT Chart
+    const isSidebarPanelOpen = !['DASHBOARD', 'CHART'].includes(activeTab);
 
     // --- RENDER HELPERS ---
     const SideNavItem = ({ icon, label, id }: { icon: any, label: string, id: string }) => (
@@ -150,9 +167,9 @@ const App: React.FC = () => {
             {clickedEntry && <EntryDetailModal entry={clickedEntry} onClose={() => setClickedEntry(null)} />}
 
             {/* TOP BAR */}
-            <header className="h-14 bg-[#151924] border-b border-[#2a2e39] flex items-center justify-between px-4 shrink-0">
+            <header className="h-14 bg-[#151924] border-b border-[#2a2e39] flex items-center justify-between px-4 shrink-0 z-50">
                 <div className="flex items-center gap-4">
-                    <div className="font-bold text-lg tracking-tight text-white flex items-center gap-2">
+                    <div className="font-bold text-lg tracking-tight text-white flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('DASHBOARD')}>
                         <span className="text-blue-500">ICT</span>MASTER
                     </div>
                     <div className="h-6 w-[1px] bg-gray-700 mx-2 hidden md:block"></div>
@@ -183,8 +200,10 @@ const App: React.FC = () => {
             {/* MAIN LAYOUT */}
             <div className="flex-1 flex overflow-hidden">
                 
-                {/* LEFT SIDEBAR (Desktop Icons) */}
-                <nav className="w-16 bg-[#151924] border-r border-[#2a2e39] hidden md:flex flex-col items-center py-4 gap-2">
+                {/* LEFT SIDEBAR (Navigation Rail) */}
+                <nav className="w-16 bg-[#151924] border-r border-[#2a2e39] hidden md:flex flex-col items-center py-4 gap-2 z-40">
+                    <SideNavItem icon={<DashboardIcon/>} label="Dash" id="DASHBOARD" />
+                    <SideNavItem icon={<ChartIcon/>} label="Chart" id="CHART" />
                     <SideNavItem icon={<ListIcon/>} label="Scanner" id="SCANNER" />
                     <SideNavItem icon={<TradeIcon/>} label="Trade" id="TRADING" />
                     <SideNavItem icon={<StatsIcon/>} label="Stats" id="STATS" />
@@ -192,90 +211,106 @@ const App: React.FC = () => {
                     <SideNavItem icon={<SettingsIcon/>} label="Settings" id="SETTINGS" />
                 </nav>
 
-                {/* CENTER CHART */}
+                {/* CENTER CONTENT AREA */}
                 <main className="flex-1 relative bg-[#0b0e11] flex flex-col min-w-0">
-                    {/* Ticker Tape */}
-                    <div className="h-6 bg-[#0b0e11] border-b border-[#2a2e39] flex items-center overflow-hidden whitespace-nowrap px-2 z-10">
-                        <div className="text-[10px] font-bold text-gray-500 mr-2">LIVE:</div>
-                        <div className="animate-marquee flex gap-8">
-                            {entries.slice(-5).reverse().map((e, i) => ( 
-                                <span key={i} className={`text-[10px] font-mono ${e.score >= 7 ? 'text-yellow-400' : 'text-gray-400'}`}>
-                                    {e.type} {asset} @ {e.price.toFixed(2)} [Score:{e.score}]
-                                </span> 
-                            ))}
-                        </div>
-                    </div>
                     
-                    <div className="flex-1 relative">
-                        <ErrorBoundary>
-                            <ChartComponent 
-                                data={data} obs={obs} fvgs={visibleFvgs} structure={structure} entries={entries} 
-                                overlays={overlays} colors={colors} onHoverEntry={setHoveredEntry} onClickEntry={setClickedEntry} 
-                                onToggleOverlay={() => setOverlays(p => ({...p, killzones: !p.killzones}))} 
-                                pdRange={pdRange} position={position} htfObs={htfObs} htfFvgs={htfFvgs}
-                                setOverlays={setOverlays}
-                                onReload={fetchData}
-                            />
-                        </ErrorBoundary>
-                        
-                        {/* Hover Tooltip */}
-                        {hoveredEntry && !clickedEntry && (
-                            <div className="absolute top-4 left-16 bg-[#151924] border border-blue-500/50 p-3 rounded shadow-xl text-xs z-50 pointer-events-none">
-                                <div className="font-bold text-white mb-1 flex items-center gap-2">
-                                    <span className={hoveredEntry.type === 'LONG' ? 'text-green-500' : 'text-red-500'}>{hoveredEntry.type}</span>
-                                    <span className="bg-gray-700 px-1 rounded text-[10px]">{hoveredEntry.setupGrade}</span>
+                    {isDashboard ? (
+                        /* DASHBOARD VIEW */
+                        <DashboardPanel 
+                            balance={balance} 
+                            backtestStats={backtestStats} 
+                            position={position} 
+                        />
+                    ) : (
+                        /* CHART VIEW */
+                        <>
+                            {/* Ticker Tape */}
+                            <div className="h-6 bg-[#0b0e11] border-b border-[#2a2e39] flex items-center overflow-hidden whitespace-nowrap px-2 z-10 shrink-0">
+                                <div className="text-[10px] font-bold text-gray-500 mr-2">LIVE:</div>
+                                <div className="animate-marquee flex gap-8">
+                                    {entries.slice(-5).reverse().map((e, i) => ( 
+                                        <span key={i} className={`text-[10px] font-mono ${e.score >= 7 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                                            {e.type} {asset} @ {e.price.toFixed(2)} [Score:{e.score}]
+                                        </span> 
+                                    ))}
                                 </div>
-                                <div className="text-gray-400 mb-1">Win Prob: <span className="text-white">{hoveredEntry.winProbability}%</span></div>
-                                <div className="text-gray-500 italic">{hoveredEntry.confluences[0]}</div>
                             </div>
-                        )}
-                    </div>
+                            
+                            <div className="flex-1 relative">
+                                <ErrorBoundary>
+                                    <ChartComponent 
+                                        data={data} obs={obs} fvgs={visibleFvgs} structure={structure} entries={entries} 
+                                        overlays={overlays} colors={colors} onHoverEntry={setHoveredEntry} onClickEntry={setClickedEntry} 
+                                        onToggleOverlay={() => setOverlays(p => ({...p, killzones: !p.killzones}))} 
+                                        pdRange={pdRange} position={position} htfObs={htfObs} htfFvgs={htfFvgs}
+                                        setOverlays={setOverlays}
+                                        onReload={fetchData}
+                                        setupVisibility={setupVisibility}
+                                        setSetupVisibility={setSetupVisibility}
+                                        focusedEntry={focusedEntry}
+                                    />
+                                </ErrorBoundary>
+                                
+                                {/* Hover Tooltip */}
+                                {hoveredEntry && !clickedEntry && (
+                                    <div className="absolute top-4 left-16 bg-[#151924] border border-blue-500/50 p-3 rounded shadow-xl text-xs z-50 pointer-events-none">
+                                        <div className="font-bold text-white mb-1 flex items-center gap-2">
+                                            <span className={hoveredEntry.type === 'LONG' ? 'text-green-500' : 'text-red-500'}>{hoveredEntry.type}</span>
+                                            <span className="bg-gray-700 px-1 rounded text-[10px]">{hoveredEntry.setupGrade}</span>
+                                        </div>
+                                        <div className="text-gray-400 mb-1">Win Prob: <span className="text-white">{hoveredEntry.winProbability}%</span></div>
+                                        <div className="text-gray-500 italic">{hoveredEntry.confluences[0]}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </main>
 
-                {/* RIGHT PANEL (Desktop - Collapsible/Persistent) */}
-                <aside className="hidden md:flex w-[320px] bg-[#151924] border-l border-[#2a2e39] flex-col">
-                    <Panels 
-                        activeTab={activeTab} setActiveTab={setActiveTab}
-                        structure={structure} entries={entries} setClickedEntry={setClickedEntry}
-                        balance={balance} position={position} data={data} closeTrade={closeTrade}
-                        enterTrade={enterTrade} slInput={slInput} setSlInput={setSlInput}
-                        tpInput={tpInput} setTpInput={setTpInput} autoTrade={autoTrade} setAutoTrade={setAutoTrade}
-                        settingsTab={settingsTab} setSettingsTab={setSettingsTab}
-                        config={config} setConfig={setConfig} overlays={overlays} setOverlays={setOverlays}
-                        colors={colors} setColors={setColors} backtestStats={backtestStats}
-                        recentHistory={recentHistory} obs={obs}
-                        simulation={simulation} setSimulation={setSimulation}
-                        onDeepScan={handleDeepScan} isScanning={isScanning}
-                    />
-                </aside>
+                {/* RIGHT SIDEBAR (Tools) - Only visible when not in Dashboard/Pure Chart mode */}
+                {isSidebarPanelOpen && (
+                    <aside className="hidden md:flex w-[320px] bg-[#151924] border-l border-[#2a2e39] flex-col z-30 shadow-xl">
+                        <Panels 
+                            activeTab={activeTab} setActiveTab={setActiveTab}
+                            structure={structure} entries={entries} setClickedEntry={setClickedEntry}
+                            balance={balance} position={position} data={data} closeTrade={closeTrade}
+                            enterTrade={enterTrade} slInput={slInput} setSlInput={setSlInput}
+                            tpInput={tpInput} setTpInput={setTpInput} autoTrade={autoTrade} setAutoTrade={setAutoTrade}
+                            settingsTab={settingsTab} setSettingsTab={setSettingsTab}
+                            config={config} setConfig={setConfig} overlays={overlays} setOverlays={setOverlays}
+                            colors={colors} setColors={setColors} backtestStats={backtestStats}
+                            recentHistory={recentHistory} obs={obs}
+                            simulation={simulation} setSimulation={setSimulation}
+                            onDeepScan={handleDeepScan} isScanning={isScanning}
+                            onFocusEntry={handleFocusEntry}
+                        />
+                    </aside>
+                )}
             </div>
 
             {/* MOBILE BOTTOM NAVIGATION */}
-            <nav className="md:hidden h-16 bg-[#151924] border-t border-[#2a2e39] flex items-center justify-around shrink-0 z-50">
+            <nav className="md:hidden h-16 bg-[#151924] border-t border-[#2a2e39] flex items-center justify-around shrink-0 z-50 pb-safe">
+                 <button onClick={() => setActiveTab('DASHBOARD')} className={`flex flex-col items-center gap-1 ${activeTab === 'DASHBOARD' ? 'text-blue-500' : 'text-gray-500'}`}>
+                    <DashboardIcon /> <span className="text-[10px]">Home</span>
+                </button>
+                <button onClick={() => setActiveTab('CHART')} className={`flex flex-col items-center gap-1 ${activeTab === 'CHART' ? 'text-blue-500' : 'text-gray-500'}`}>
+                    <ChartIcon /> <span className="text-[10px]">Chart</span>
+                </button>
                 <button onClick={() => setActiveTab('SCANNER')} className={`flex flex-col items-center gap-1 ${activeTab === 'SCANNER' ? 'text-blue-500' : 'text-gray-500'}`}>
                     <ListIcon /> <span className="text-[10px]">Scanner</span>
                 </button>
                 <button onClick={() => setActiveTab('TRADING')} className={`flex flex-col items-center gap-1 ${activeTab === 'TRADING' ? 'text-blue-500' : 'text-gray-500'}`}>
                     <TradeIcon /> <span className="text-[10px]">Trade</span>
                 </button>
-                <div className="w-12 h-12 rounded-full bg-blue-600 -mt-6 border-4 border-[#0b0e11] flex items-center justify-center text-white font-bold shadow-lg" onClick={() => setShowTopSetups(true)}>
-                    ⚡
-                </div>
-                <button onClick={() => setActiveTab('STATS')} className={`flex flex-col items-center gap-1 ${activeTab === 'STATS' ? 'text-blue-500' : 'text-gray-500'}`}>
-                    <StatsIcon /> <span className="text-[10px]">Stats</span>
-                </button>
-                <button onClick={() => setActiveTab('SETTINGS')} className={`flex flex-col items-center gap-1 ${activeTab === 'SETTINGS' ? 'text-blue-500' : 'text-gray-500'}`}>
-                    <SettingsIcon /> <span className="text-[10px]">Config</span>
-                </button>
             </nav>
 
-            {/* MOBILE PANEL DRAWER (If active tab matches) */}
-            <div className={`md:hidden fixed inset-0 z-40 bg-[#0b0e11] transform transition-transform duration-300 flex flex-col ${activeTab ? 'translate-y-0' : 'translate-y-full'} ${activeTab === 'CHART' ? 'hidden' : ''}`}>
-                 <div className="flex items-center justify-between p-4 border-b border-gray-800">
+            {/* MOBILE PANEL DRAWER (Scanner/Stats/Trading overlay on mobile) */}
+            <div className={`md:hidden fixed inset-0 z-50 bg-[#0b0e11] transform transition-transform duration-300 flex flex-col ${isSidebarPanelOpen ? 'translate-y-0' : 'translate-y-full'}`}>
+                 <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-[#151924]">
                     <h2 className="font-bold text-lg text-white">{activeTab}</h2>
                     <button onClick={() => setActiveTab('CHART')} className="text-gray-400 p-2">✕ Close</button>
                  </div>
-                 <div className="flex-1 overflow-y-auto p-4">
+                 <div className="flex-1 overflow-y-auto">
                     <Panels 
                         activeTab={activeTab} setActiveTab={setActiveTab}
                         structure={structure} entries={entries} setClickedEntry={setClickedEntry}
@@ -288,6 +323,7 @@ const App: React.FC = () => {
                         recentHistory={recentHistory} obs={obs}
                         simulation={simulation} setSimulation={setSimulation}
                         onDeepScan={handleDeepScan} isScanning={isScanning}
+                        onFocusEntry={handleFocusEntry}
                     />
                  </div>
             </div>

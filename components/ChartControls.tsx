@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { OverlayState, EntrySignal } from '../types';
 
@@ -58,7 +59,6 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                                 onClick={() => {
                                     setOverlays({...overlays, historicalTradeLines: !overlays.historicalTradeLines});
                                     if(setupVisibility === 'NONE') setSetupVisibility('ALL');
-                                    // If we are turning it off, set visibility to NONE
                                     else if(overlays.historicalTradeLines) setSetupVisibility('NONE');
                                 }}
                             >
@@ -95,7 +95,12 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                             <div className="px-4 py-1">
                                 <button 
                                     className="text-xs text-blue-400 hover:text-white w-full text-left"
-                                    onClick={() => { setSetupVisibility('ALL'); setOverlays({...overlays, historicalTradeLines: true}); setActivePopup(null); }}
+                                    onClick={() => { 
+                                        // When forcing "Show All", we must also enable the layer
+                                        setSetupVisibility('ALL'); 
+                                        setOverlays({...overlays, historicalTradeLines: true}); 
+                                        setActivePopup(null); 
+                                    }}
                                 >
                                     Show All Setups
                                 </button>
@@ -111,7 +116,10 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                     <div className="flex justify-between items-center mb-2">
                         <span className="text-[10px] font-bold text-blue-400 uppercase">Focus Mode</span>
                         <button 
-                            onClick={() => setSetupVisibility('ALL')}
+                            onClick={() => {
+                                // Exit focus: If layer is ON, show ALL. If layer is OFF, show NONE.
+                                setSetupVisibility(overlays.historicalTradeLines ? 'ALL' : 'NONE');
+                            }}
                             className="text-gray-400 hover:text-white bg-gray-800 rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
                         >✕</button>
                     </div>
@@ -121,7 +129,10 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                         <span className="text-gray-400 text-xs font-mono">@{focusedEntry.price.toFixed(2)}</span>
                     </div>
                      <button 
-                        onClick={() => setSetupVisibility('ALL')}
+                        onClick={() => {
+                             setSetupVisibility('ALL');
+                             setOverlays({...overlays, historicalTradeLines: true});
+                        }}
                         className="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 rounded transition-colors"
                     >
                         Show All

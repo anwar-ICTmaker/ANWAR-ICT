@@ -1,3 +1,4 @@
+
 import { ISeriesApi, ITimeScaleApi, Time } from "lightweight-charts";
 import { CandleData, EntrySignal, FVG, OrderBlock, OverlayState, ColorTheme, UTCTimestamp } from "../types";
 import { drawSetups } from "./drawSetups";
@@ -16,7 +17,8 @@ export const drawCanvasLayer = (
     width: number,
     height: number,
     htfObs: OrderBlock[] = [],
-    htfFvgs: FVG[] = []
+    htfFvgs: FVG[] = [],
+    setupVisibility: 'ALL' | 'FOCUS' | 'NONE' = 'NONE'
 ) => {
     // Clear Canvas
     ctx.clearRect(0, 0, width, height);
@@ -110,9 +112,8 @@ export const drawCanvasLayer = (
     }
 
     // --- 4. TRADE SETUPS (ENTRY/SL/TP BOXES) ---
-    // IMPORTANT: 'entries' passed here is already filtered by Chart.tsx (e.g., contains only focused entry if Focus mode is on)
-    // We only draw if historicalTradeLines is enabled in overlay state.
-    if (overlays.historicalTradeLines && entries.length > 0) {
+    // Rule: Draw if 'historicalTradeLines' is checked OR if we are in FOCUS mode (forcing a single trade visibility)
+    if ((overlays.historicalTradeLines || setupVisibility === 'FOCUS') && entries.length > 0) {
         drawSetups(ctx, timeScale, series, data, entries, true, width);
     }
 };

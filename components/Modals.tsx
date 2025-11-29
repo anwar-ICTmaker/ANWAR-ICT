@@ -1,4 +1,4 @@
-import React, { useMemo, Component, ReactNode } from 'react';
+import React, { useMemo, ReactNode, Component } from 'react';
 import { EntrySignal } from '../types';
 
 export const EntryDetailModal = ({ entry, onClose }: { entry: EntrySignal, onClose: () => void }) => (
@@ -103,7 +103,9 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+    public state: ErrorBoundaryState = { hasError: false };
+
     constructor(props: ErrorBoundaryProps) {
         super(props);
         this.state = { hasError: false };
@@ -118,7 +120,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     }
     
     render() {
-        if (this.state.hasError) return <div className="flex items-center justify-center h-full text-red-500 bg-gray-900 p-4">Chart Error (See Console)</div>;
+        if (this.state.hasError) return (
+            <div className="flex items-center justify-center h-full text-red-500 bg-gray-900 p-4 flex-col gap-4">
+                <h3 className="font-bold text-lg">Chart Component Error</h3>
+                <p className="text-sm text-gray-400">Something went wrong while rendering the chart.</p>
+                <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-4 py-2 rounded">Reload Page</button>
+            </div>
+        );
         return this.props.children;
     }
 }

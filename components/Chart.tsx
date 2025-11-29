@@ -66,10 +66,6 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             const entryIndex = props.data.findIndex(d => d.time === entryTime);
             
             if (entryIndex !== -1) {
-                // Determine a nice range
-                // If trade is closed, zoom to fit the whole trade + some buffer
-                // If open, just show entry + 50 bars
-                
                 let toIndex = entryIndex + 50;
                 if (exitTime) {
                     const exitIndex = props.data.findIndex(d => d.time === exitTime);
@@ -155,8 +151,6 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         
         chart.subscribeClick(param => {
             if (param.time) {
-                // Check if user clicked on an entry
-                // Find nearest entry to click time (within tolerance)
                 const clickTime = param.time as number;
                 const e = visibleEntries.find((x: any) => Math.abs(x.time - clickTime) < 300); // 5 min tolerance
                 if (e) props.onClickEntry(e);
@@ -316,7 +310,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             <canvas ref={canvasRef} className="absolute top-0 left-0 pointer-events-none z-10" />
             
             {/* Zoom Controls (Bottom Right) */}
-            <div className="absolute bottom-16 right-4 flex flex-col gap-2 z-30">
+            <div className="absolute bottom-16 right-4 flex flex-col gap-2 z-30 pointer-events-auto">
                 <button onClick={() => handleZoom(0.8)} className="w-10 h-10 bg-[#1e222d] text-white rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 flex items-center justify-center opacity-80 transition-opacity hover:opacity-100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 </button>

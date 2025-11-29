@@ -24,6 +24,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
     };
     
     // SAFETY CHECKS: Ensure no NaN/Infinite values pass to the DOM/Styles
+    // This is critical to prevent "Black Screen" crashes in React
     const safeWinRate = (!stats.winRate || isNaN(stats.winRate) || !isFinite(stats.winRate)) ? 0 : stats.winRate;
     const safeProfitFactor = (!stats.profitFactor || isNaN(stats.profitFactor) || !isFinite(stats.profitFactor)) ? 0 : stats.profitFactor;
     const safeTotalTrades = stats.totalTrades || 0;
@@ -48,8 +49,8 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
     );
 
     const ProgressBar = ({ label, value, color }: { label: string, value: number, color: string }) => {
-        // Safe percentage calculation
-        const cleanValue = Math.min(100, Math.max(0, isNaN(value) ? 0 : value));
+        // Safe percentage calculation with bounds 0-100
+        const cleanValue = Math.min(100, Math.max(0, (isNaN(value) || !isFinite(value)) ? 0 : value));
         return (
             <div className="mb-4">
                 <div className="flex justify-between text-xs mb-1">

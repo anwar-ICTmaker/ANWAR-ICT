@@ -21,7 +21,7 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
     };
 
     return (
-        <div className="absolute top-4 right-14 z-30 flex flex-col gap-2 items-end">
+        <div className="absolute top-16 right-4 z-30 flex flex-col gap-2 items-end pointer-events-auto">
             
             {/* TOOLBAR CONTAINER */}
             <div className="flex flex-col bg-[#1e222d] border border-[#2a2e39] rounded-lg shadow-2xl p-1 gap-1">
@@ -49,17 +49,17 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
 
                     {/* LAYERS POPUP */}
                     {activePopup === 'LAYERS' && (
-                        <div className="absolute right-10 top-0 bg-[#1e222d] border border-[#2a2e39] rounded shadow-xl w-56 py-2 z-50">
-                            <div className="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Chart Visibility</div>
+                        <div className="absolute right-10 top-0 bg-[#1e222d] border border-[#2a2e39] rounded shadow-xl w-60 py-2 z-50">
+                            <div className="px-3 py-1 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Chart Overlays</div>
                             
                             {/* Toggle: Setups */}
                             <div 
                                 className="flex items-center justify-between px-4 py-2 hover:bg-gray-800 cursor-pointer transition-colors"
                                 onClick={() => {
                                     setOverlays({...overlays, historicalTradeLines: !overlays.historicalTradeLines});
-                                    // Logic to ensure we don't end up in weird state
                                     if(setupVisibility === 'NONE') setSetupVisibility('ALL');
-                                    else if(setupVisibility === 'ALL' && overlays.historicalTradeLines) setSetupVisibility('NONE');
+                                    // If we are turning it off, set visibility to NONE
+                                    else if(overlays.historicalTradeLines) setSetupVisibility('NONE');
                                 }}
                             >
                                 <span className="text-sm text-gray-300">Trade Setups</span>
@@ -95,9 +95,9 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                             <div className="px-4 py-1">
                                 <button 
                                     className="text-xs text-blue-400 hover:text-white w-full text-left"
-                                    onClick={() => { setSetupVisibility('ALL'); setActivePopup(null); }}
+                                    onClick={() => { setSetupVisibility('ALL'); setOverlays({...overlays, historicalTradeLines: true}); setActivePopup(null); }}
                                 >
-                                    Reset View
+                                    Show All Setups
                                 </button>
                             </div>
                         </div>
@@ -124,7 +124,7 @@ export const ChartControls: React.FC<ChartControlsProps> = ({
                         onClick={() => setSetupVisibility('ALL')}
                         className="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 rounded transition-colors"
                     >
-                        Exit Focus
+                        Show All
                     </button>
                 </div>
             )}

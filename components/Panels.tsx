@@ -34,6 +34,7 @@ interface PanelProps {
     isScanning: boolean;
     onFocusEntry?: (e: EntrySignal) => void;
     focusedEntry?: EntrySignal | null;
+    onReplay?: (e: EntrySignal) => void;
 }
 
 export const Panels: React.FC<PanelProps> = (props) => {
@@ -52,6 +53,7 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 isScanning={props.isScanning} 
                 onFocusEntry={props.onFocusEntry}
                 focusedEntry={props.focusedEntry}
+                onReplay={props.onReplay}
                 {...commonProps}
             />;
         case 'TRADING':
@@ -73,6 +75,7 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 setClickedEntry={props.setClickedEntry} 
                 onFocusEntry={props.onFocusEntry}
                 focusedEntry={props.focusedEntry}
+                onReplay={props.onReplay}
                 {...commonProps}
             /> : <div className="p-4 text-center">Loading Stats...</div>;
         case 'SETUPS': 

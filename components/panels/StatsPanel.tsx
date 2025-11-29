@@ -8,9 +8,10 @@ interface StatsPanelProps {
     setClickedEntry: (e: EntrySignal) => void;
     onFocusEntry?: (e: EntrySignal) => void;
     focusedEntry?: EntrySignal | null;
+    onReplay?: (e: EntrySignal) => void;
 }
 
-export const StatsPanel: React.FC<StatsPanelProps> = ({ backtestStats, recentHistory, setClickedEntry, onFocusEntry, focusedEntry }) => {
+export const StatsPanel: React.FC<StatsPanelProps> = ({ backtestStats, recentHistory, setClickedEntry, onFocusEntry, focusedEntry, onReplay }) => {
     return (
         <div className="h-full flex flex-col bg-[#151924]">
             <div className="p-4 border-b border-[#2a2e39] flex justify-between items-center shrink-0">
@@ -57,21 +58,30 @@ export const StatsPanel: React.FC<StatsPanelProps> = ({ backtestStats, recentHis
                                     <div className={`font-mono text-sm font-bold ${entry.backtestPnL && entry.backtestPnL > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                         {entry.backtestPnL && entry.backtestPnL > 0 ? '+' : ''}{entry.backtestPnL?.toFixed(0)}
                                     </div>
-                                    {onFocusEntry && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} 
-                                            className={`p-1 transition-colors ${isFocused ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-white'}`}
-                                            title={isFocused ? "Currently Viewing" : "View on Chart"}
-                                        >
-                                            {isFocused ? (
-                                                // Eye Icon (Visible/Active)
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                            ) : (
-                                                // Crosshair/Target Icon (Not focused)
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
-                                            )}
-                                        </button>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                        {onReplay && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onReplay(entry); }}
+                                                className="p-1 rounded bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition-all"
+                                                title="Replay Trade"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                            </button>
+                                        )}
+                                        {onFocusEntry && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} 
+                                                className={`p-1 transition-colors ${isFocused ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-white'}`}
+                                                title={isFocused ? "Currently Viewing" : "View on Chart"}
+                                            >
+                                                {isFocused ? (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                ) : (
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );

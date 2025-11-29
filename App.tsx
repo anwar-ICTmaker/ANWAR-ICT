@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CandleData, OrderBlock, FVG, StructurePoint, EntrySignal, BacktestStats, TradeEntry, UTCTimestamp, SimulationConfig } from './types';
 import { fetchCandles, getHtf } from './services/api';
 import { detectStructure, detectOrderBlocks, detectFVG, detectEntries } from './services/ict';
@@ -16,6 +16,7 @@ const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" he
 const TradeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>;
 const StatsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>;
 const DashboardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+const BacktestIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 2v6h6M2.66 15.57a10 10 0 1 0 .57-8.38"/></svg>;
 
 const App: React.FC = () => {
     // --- STATE ---
@@ -38,6 +39,10 @@ const App: React.FC = () => {
     const [clickedEntry, setClickedEntry] = useState<EntrySignal | null>(null);
     const [hoveredEntry, setHoveredEntry] = useState<EntrySignal | null>(null);
     const [isScanning, setIsScanning] = useState(false);
+
+    // Replay State
+    const [replayMode, setReplayMode] = useState({ active: false, index: 0, playing: false, speed: 500 });
+    const [replayDateInput, setReplayDateInput] = useState('');
 
     // Visibility & Focus State
     const [setupVisibility, setSetupVisibility] = useState<'ALL'|'FOCUS'|'NONE'>('ALL');
@@ -75,6 +80,12 @@ const App: React.FC = () => {
 
             setData(candles);
             
+            // If in replay, ensure we update max index if needed, or if live update, we might need to handle it.
+            // But for simplicity, replay pauses live updates mentally.
+            if (!replayMode.active) {
+                setReplayMode(prev => ({...prev, index: candles.length}));
+            }
+
             const recentSlice = candles.slice(-100);
             setPdRange({ high: Math.max(...recentSlice.map(c => c.high)), low: Math.min(...recentSlice.map(c => c.low)) });
 
@@ -111,16 +122,90 @@ const App: React.FC = () => {
             setEntries(bt.results);
             setStructure(_structure); setObs(_obs); setFvgs(_fvgs);
 
-            // Proximity Alert
             const currentPrice = candles[candles.length - 1].close;
             const nearestOB = obsForDetection.find(ob => !ob.mitigated && Math.abs(currentPrice - ob.priceHigh) / currentPrice < 0.0005); 
-            if (nearestOB && !alert) {
+            if (nearestOB && !alert && !replayMode.active) {
                 setAlert({ msg: `Price near ${nearestOB.direction} Order Block!`, type: 'warning' });
             }
         } catch (e) { console.error(e); }
     };
 
     useEffect(() => { fetchData(); const interval = setInterval(fetchData, 60000); return () => clearInterval(interval); }, [asset, timeframe, autoTrade, config, simulation]);
+
+    // --- REPLAY LOGIC ---
+    useEffect(() => {
+        let interval: any;
+        if (replayMode.active && replayMode.playing) {
+            interval = setInterval(() => {
+                setReplayMode(prev => {
+                    if (prev.index >= data.length) {
+                        return { ...prev, playing: false };
+                    }
+                    return { ...prev, index: prev.index + 1 };
+                });
+            }, replayMode.speed);
+        }
+        return () => clearInterval(interval);
+    }, [replayMode.active, replayMode.playing, replayMode.speed, data.length]);
+
+    const handleStartReplay = (trade?: EntrySignal) => {
+        if (trade) {
+            const tradeIndex = data.findIndex(d => d.time === trade.time);
+            if (tradeIndex === -1) return;
+            // Start 50 candles before execution
+            const startIndex = Math.max(0, tradeIndex - 50);
+            setReplayMode({ active: true, index: startIndex, playing: false, speed: 500 });
+            setFocusedEntry(trade);
+            setSetupVisibility('FOCUS');
+        } else {
+            // Manual Start from date or random
+            let startIndex = 0;
+            if (replayDateInput && data.length > 0) {
+                 const targetTime = new Date(replayDateInput).getTime() / 1000;
+                 // Find closest candle
+                 const closest = data.findIndex(d => (d.time as number) >= targetTime);
+                 startIndex = closest !== -1 ? closest : 0;
+            } else if (data.length > 0) {
+                 // Random point in last 50% of data
+                 startIndex = Math.floor(data.length / 2 + Math.random() * (data.length / 2));
+            }
+            setReplayMode({ active: true, index: startIndex, playing: false, speed: 500 });
+            setFocusedEntry(null);
+            setSetupVisibility('ALL');
+        }
+        setActiveTab('BACKTEST');
+    };
+
+    const handleReplayControls = {
+        togglePlay: () => setReplayMode(p => ({ ...p, playing: !p.playing })),
+        changeSpeed: () => setReplayMode(p => ({ ...p, speed: p.speed === 100 ? 800 : p.speed === 800 ? 500 : p.speed === 500 ? 200 : 100 })), // cycle speeds
+        exit: () => {
+            setReplayMode(p => ({ ...p, active: false, playing: false }));
+            setSetupVisibility('ALL');
+            setFocusedEntry(null);
+        },
+        seek: (val: number) => setReplayMode(p => ({ ...p, index: val }))
+    };
+
+    // Calculate displayed data based on replay
+    const displayedData = useMemo(() => {
+        if (!replayMode.active) return data;
+        return data.slice(0, replayMode.index);
+    }, [data, replayMode.active, replayMode.index]);
+
+    // Filter indicators for replay to avoid look-ahead
+    const displayedObs = useMemo(() => {
+         if (!replayMode.active) return obs;
+         const lastTime = displayedData.length > 0 ? displayedData[displayedData.length-1].time as number : 0;
+         return obs.filter(o => (o.time as number) <= lastTime);
+    }, [obs, replayMode.active, displayedData]);
+
+    const displayedFvgs = useMemo(() => {
+         if (!replayMode.active) return fvgs;
+         const lastTime = displayedData.length > 0 ? displayedData[displayedData.length-1].time as number : 0;
+         return fvgs.filter(f => (f.time as number) <= lastTime);
+    }, [fvgs, replayMode.active, displayedData]);
+
 
     // --- ACTIONS ---
     const enterTrade = (type: 'LONG'|'SHORT', price: number, sl: number, tp: number) => { 
@@ -146,12 +231,12 @@ const App: React.FC = () => {
     const thirtyDaysAgoTimestamp = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
     const recentHistory = entries.filter(e => e.backtestResult !== 'PENDING' && (e.time as number) > thirtyDaysAgoTimestamp);
     const isLowTf = ['1m', '3m'].includes(timeframe);
-    const visibleFvgs = isLowTf ? [] : fvgs;
+    const visibleFvgs = isLowTf ? [] : displayedFvgs;
 
     // --- LAYOUT LOGIC ---
     const isDashboard = activeTab === 'DASHBOARD';
-    // Sidebar panels are active if tab is NOT Dashboard and NOT Chart
-    const isSidebarPanelOpen = !['DASHBOARD', 'CHART'].includes(activeTab);
+    // Sidebar panels are active if tab is NOT Dashboard, NOT Chart, and NOT Backtest
+    const isSidebarPanelOpen = !['DASHBOARD', 'CHART', 'BACKTEST'].includes(activeTab);
 
     // --- RENDER HELPERS ---
     const SideNavItem = ({ icon, label, id }: { icon: any, label: string, id: string }) => (
@@ -204,6 +289,7 @@ const App: React.FC = () => {
                 <nav className="w-16 bg-[#151924] border-r border-[#2a2e39] hidden md:flex flex-col items-center py-4 gap-2 z-40">
                     <SideNavItem icon={<DashboardIcon/>} label="Dash" id="DASHBOARD" />
                     <SideNavItem icon={<ChartIcon/>} label="Chart" id="CHART" />
+                    <SideNavItem icon={<BacktestIcon/>} label="Replay" id="BACKTEST" />
                     <SideNavItem icon={<ListIcon/>} label="Scanner" id="SCANNER" />
                     <SideNavItem icon={<TradeIcon/>} label="Trade" id="TRADING" />
                     <SideNavItem icon={<StatsIcon/>} label="Stats" id="STATS" />
@@ -214,7 +300,7 @@ const App: React.FC = () => {
                 {/* CENTER CONTENT AREA */}
                 <main className="flex-1 relative bg-[#0b0e11] flex flex-col min-w-0">
                     
-                    {isDashboard ? (
+                    {activeTab === 'DASHBOARD' ? (
                         /* DASHBOARD VIEW */
                         <DashboardPanel 
                             balance={balance} 
@@ -223,8 +309,72 @@ const App: React.FC = () => {
                             currentAsset={asset}
                             onAssetChange={setAsset}
                         />
+                    ) : activeTab === 'BACKTEST' ? (
+                        /* BACKTEST / REPLAY VIEW */
+                        replayMode.active ? (
+                             <div className="flex-1 relative h-full">
+                                <ErrorBoundary>
+                                    <ChartComponent 
+                                        data={displayedData} obs={displayedObs} fvgs={visibleFvgs} structure={structure} entries={entries} 
+                                        overlays={overlays} colors={colors} onHoverEntry={setHoveredEntry} onClickEntry={setClickedEntry} 
+                                        onToggleOverlay={() => setOverlays(p => ({...p, killzones: !p.killzones}))} 
+                                        pdRange={pdRange} position={position} htfObs={htfObs} htfFvgs={htfFvgs}
+                                        setOverlays={setOverlays}
+                                        onReload={fetchData}
+                                        setupVisibility={setupVisibility}
+                                        setSetupVisibility={setSetupVisibility}
+                                        focusedEntry={focusedEntry}
+                                        replayState={{...replayMode, maxIndex: data.length}}
+                                        onReplayControl={handleReplayControls}
+                                    />
+                                </ErrorBoundary>
+                            </div>
+                        ) : (
+                            /* BACKTEST CONFIG SCREEN */
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0b0e11]">
+                                <div className="bg-[#151924] p-8 rounded-xl border border-[#2a2e39] max-w-md w-full shadow-2xl">
+                                    <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                                        <div className="bg-blue-600 p-2 rounded-lg"><BacktestIcon /></div>
+                                        Replay Simulator
+                                    </h2>
+                                    
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-400 mb-2 block uppercase">Select Asset</label>
+                                            <div className="bg-[#0b0e11] p-3 rounded border border-[#2a2e39] text-white font-mono">{asset}</div>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-bold text-gray-400 mb-2 block uppercase">Start Date</label>
+                                            <input 
+                                                type="datetime-local" 
+                                                className="w-full bg-[#0b0e11] text-white p-3 rounded border border-[#2a2e39] focus:border-blue-500 outline-none"
+                                                value={replayDateInput}
+                                                onChange={e => setReplayDateInput(e.target.value)}
+                                            />
+                                            <p className="text-xs text-gray-500 mt-2">Leave empty to start from a random point.</p>
+                                        </div>
+
+                                        <button 
+                                            onClick={() => handleStartReplay()}
+                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-lg font-bold text-lg shadow-lg transition-transform hover:scale-[1.02]"
+                                        >
+                                            START SESSION
+                                        </button>
+
+                                        <div className="pt-4 border-t border-[#2a2e39]">
+                                             <div className="text-xs text-gray-500 text-center mb-2">OR PRACTICE SPECIFIC SETUPS</div>
+                                             <div className="grid grid-cols-2 gap-2">
+                                                 <button onClick={() => setAlert({msg: "Feature coming soon!", type: "info"})} className="bg-[#0b0e11] hover:bg-gray-800 text-gray-400 py-2 rounded border border-[#2a2e39] text-xs font-bold">ORDER BLOCKS</button>
+                                                 <button onClick={() => setAlert({msg: "Feature coming soon!", type: "info"})} className="bg-[#0b0e11] hover:bg-gray-800 text-gray-400 py-2 rounded border border-[#2a2e39] text-xs font-bold">FVG ENTRIES</button>
+                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )
                     ) : (
-                        /* CHART VIEW */
+                        /* CHART VIEW (Live) */
                         <>
                             {/* Ticker Tape */}
                             <div className="h-6 bg-[#0b0e11] border-b border-[#2a2e39] flex items-center overflow-hidden whitespace-nowrap px-2 z-10 shrink-0">
@@ -250,6 +400,9 @@ const App: React.FC = () => {
                                         setupVisibility={setupVisibility}
                                         setSetupVisibility={setSetupVisibility}
                                         focusedEntry={focusedEntry}
+                                        // Replay is disabled in Live View
+                                        replayState={{ active: false, index: 0, playing: false, speed: 0, maxIndex: 0 }}
+                                        onReplayControl={handleReplayControls}
                                     />
                                 </ErrorBoundary>
                                 
@@ -269,7 +422,7 @@ const App: React.FC = () => {
                     )}
                 </main>
 
-                {/* RIGHT SIDEBAR (Tools) - Only visible when not in Dashboard/Pure Chart mode */}
+                {/* RIGHT SIDEBAR (Tools) - Only visible when not in Dashboard/Backtest/Pure Chart mode */}
                 {isSidebarPanelOpen && (
                     <aside className="hidden md:flex w-[320px] bg-[#151924] border-l border-[#2a2e39] flex-col z-30 shadow-xl">
                         <Panels 
@@ -286,6 +439,8 @@ const App: React.FC = () => {
                             onDeepScan={handleDeepScan} isScanning={isScanning}
                             onFocusEntry={handleFocusEntry}
                             focusedEntry={focusedEntry}
+                            // @ts-ignore
+                            onReplay={handleStartReplay}
                         />
                     </aside>
                 )}
@@ -298,6 +453,9 @@ const App: React.FC = () => {
                 </button>
                 <button onClick={() => setActiveTab('CHART')} className={`flex flex-col items-center gap-1 ${activeTab === 'CHART' ? 'text-blue-500' : 'text-gray-500'}`}>
                     <ChartIcon /> <span className="text-[10px]">Chart</span>
+                </button>
+                <button onClick={() => setActiveTab('BACKTEST')} className={`flex flex-col items-center gap-1 ${activeTab === 'BACKTEST' ? 'text-blue-500' : 'text-gray-500'}`}>
+                    <BacktestIcon /> <span className="text-[10px]">Replay</span>
                 </button>
                 <button onClick={() => setActiveTab('SCANNER')} className={`flex flex-col items-center gap-1 ${activeTab === 'SCANNER' ? 'text-blue-500' : 'text-gray-500'}`}>
                     <ListIcon /> <span className="text-[10px]">Scanner</span>
@@ -328,6 +486,8 @@ const App: React.FC = () => {
                         onDeepScan={handleDeepScan} isScanning={isScanning}
                         onFocusEntry={handleFocusEntry}
                         focusedEntry={focusedEntry}
+                        // @ts-ignore
+                        onReplay={handleStartReplay}
                     />
                  </div>
             </div>

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
     createChart, 
@@ -14,6 +15,7 @@ import {
 import { CandleData, EntrySignal, FVG, OrderBlock, OverlayState, StructurePoint, TradeEntry, ColorTheme } from '../types';
 import { drawCanvasLayer } from '../services/chartOverlay';
 import { ChartControls } from './ChartControls';
+import { ReplayControls } from './ReplayControls';
 
 interface ChartProps {
     data: CandleData[];
@@ -35,6 +37,21 @@ interface ChartProps {
     setupVisibility: 'ALL' | 'FOCUS' | 'NONE';
     setSetupVisibility: (mode: 'ALL' | 'FOCUS' | 'NONE') => void;
     focusedEntry: EntrySignal | null;
+    
+    // Replay Props
+    replayState: {
+        active: boolean;
+        index: number;
+        playing: boolean;
+        speed: number;
+        maxIndex: number;
+    };
+    onReplayControl: {
+        togglePlay: () => void;
+        changeSpeed: () => void;
+        exit: () => void;
+        seek: (val: number) => void;
+    }
 }
 
 export const ChartComponent: React.FC<ChartProps> = (props) => {
@@ -48,16 +65,34 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     const mousePos = useRef<{ x: number, y: number } | null>(null);
     const drawCanvasOverlayRef = useRef<() => void>(() => {});
 
-    // Filtered Entries based on Visibility Mode
+    // Filtered Entries based on Visibility Mode and Replay Time
     const visibleEntries = useMemo(() => {
-        if (props.setupVisibility === 'NONE') return [];
-        if (props.setupVisibility === 'FOCUS' && props.focusedEntry) return [props.focusedEntry];
-        return props.entries;
-    }, [props.entries, props.setupVisibility, props.focusedEntry]);
+        let list = props.entries;
+        
+        // If replay active, filter out entries from the future
+        if (props.replayState.active && props.data.length > 0) {
+            const lastTime = props.data[props.data.length - 1].time as number;
+            list = list.filter(e => (e.time as number) <= lastTime);
+        }
 
-    // Zoom to focused entry effect
+        if (props.setupVisibility === 'NONE') return [];
+        if (props.setupVisibility === 'FOCUS' && props.focusedEntry) {
+            // Check if focused entry is still valid in replay time
+            if (props.replayState.active) {
+                const lastTime = props.data[props.data.length - 1].time as number;
+                if ((props.focusedEntry.time as number) > lastTime) return []; 
+            }
+            return [props.focusedEntry];
+        }
+        return list;
+    }, [props.entries, props.setupVisibility, props.focusedEntry, props.replayState.active, props.data]);
+
+    // Zoom to focused entry effect (Only when not in replay or initial replay setup)
     useEffect(() => {
         if (props.setupVisibility === 'FOCUS' && props.focusedEntry && chartRef.current && props.data.length > 0) {
+            // Avoid auto-zooming constantly during replay playback to allow user control
+            if (props.replayState.active && props.replayState.playing) return;
+
             const chart = chartRef.current;
             const entryTime = props.focusedEntry.time as number;
             const exitTime = props.focusedEntry.exitTime as number | undefined;
@@ -70,17 +105,17 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 if (exitTime) {
                     const exitIndex = props.data.findIndex(d => d.time === exitTime);
                     if (exitIndex !== -1) {
-                         toIndex = exitIndex + 20; // Add buffer after exit
+                         toIndex = exitIndex + 20; 
                     }
                 }
                 
-                const fromIndex = Math.max(0, entryIndex - 30); // Show context before
+                const fromIndex = Math.max(0, entryIndex - 30); 
                 toIndex = Math.min(props.data.length - 1, toIndex);
                 
                 chart.timeScale().setVisibleLogicalRange({ from: fromIndex, to: toIndex });
             }
         }
-    }, [props.focusedEntry, props.setupVisibility, props.data]); 
+    }, [props.focusedEntry, props.setupVisibility, props.data.length]); // Dep change to avoid re-trigger on data update during replay
 
     // Initialize Chart
     useEffect(() => {
@@ -203,8 +238,21 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 return { ...d, color, borderColor };
             });
             candleSeriesRef.current.setData(coloredData);
+            
+            // Auto-scroll logic for Replay Playback
+            if (props.replayState.active && props.replayState.playing && chartRef.current) {
+                 // Check if latest candle is visible, if not, scroll to it
+                 const timeScale = chartRef.current.timeScale();
+                 const range = timeScale.getVisibleLogicalRange();
+                 if (range) {
+                    const distFromRight = props.data.length - range.to;
+                    if (distFromRight < 10) {
+                         timeScale.scrollToRealTime(); 
+                    }
+                 }
+            }
         }
-    }, [props.data, visibleEntries, props.overlays, props.focusedEntry, props.setupVisibility]);
+    }, [props.data, visibleEntries, props.overlays, props.focusedEntry, props.setupVisibility, props.replayState.playing]);
 
     // Update Sessions & Macro
     useEffect(() => {
@@ -240,49 +288,33 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
              activeTradeLinesRef.current.forEach(l => candleSeriesRef.current?.removePriceLine(l));
              activeTradeLinesRef.current = [];
             if (props.position) {
-                // Highlighted Entry Line
                 activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                    price: props.position.price, 
-                    color: '#2962FF', // Bright Blue
-                    lineWidth: 3,     // Thicker for emphasis
-                    lineStyle: 0,     // Solid
-                    axisLabelVisible: true, 
-                    title: 'ENTRY' 
+                    price: props.position.price, color: '#2962FF', lineWidth: 3, lineStyle: 0, axisLabelVisible: true, title: 'ENTRY' 
                 }));
-                
-                // Highlighted SL Line
                 if (props.position.stopLoss) {
                     activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                        price: props.position.stopLoss, 
-                        color: '#FF1744', // Brighter Red
-                        lineWidth: 2,     // Thicker
-                        lineStyle: 2,     // Dashed
-                        axisLabelVisible: true, 
-                        title: 'SL' 
+                        price: props.position.stopLoss, color: '#FF1744', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: 'SL' 
                     }));
                 }
-                
-                // Highlighted TP Line
                 if (props.position.takeProfit) {
                     activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                        price: props.position.takeProfit, 
-                        color: '#00E676', // Brighter Green
-                        lineWidth: 2,     // Thicker
-                        lineStyle: 2,     // Dashed
-                        axisLabelVisible: true, 
-                        title: 'TP' 
+                        price: props.position.takeProfit, color: '#00E676', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: 'TP' 
                     }));
                 }
             }
             const markers: SeriesMarker<Time>[] = [];
+            
+            // Only draw structure if within replay time
+            const lastTime = props.data.length > 0 ? props.data[props.data.length - 1].time as number : Infinity;
+
             if (props.overlays.swingStructure) {
-                props.structure.forEach((s: any) => {
+                props.structure.filter(s => (s.time as number) <= lastTime).forEach((s: any) => {
                      if (['HH','HL','LH','LL'].includes(s.type))
                         markers.push({ time: s.time, position: s.type.includes('H')?'aboveBar':'belowBar', color: s.type.includes('H')?'#ef5350':'#0ecb81', shape: s.type.includes('H')?'arrowDown':'arrowUp', text: s.type });
                 });
             }
             if (props.overlays.internalStructure) {
-                 props.structure.forEach((s: any) => {
+                 props.structure.filter(s => (s.time as number) <= lastTime).forEach((s: any) => {
                      if (['BOS','CHoCH'].includes(s.type))
                         // @ts-ignore
                         markers.push({ time: s.time, position: s.type.includes('BOS') ? (s.direction==='Bullish'?'belowBar':'aboveBar') : 'aboveBar', color: s.type==='BOS'?'#2962FF':'#E040FB', shape: 'none', text: s.type });
@@ -339,7 +371,6 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             <div ref={chartContainerRef} className="flex-1 w-full h-full overflow-hidden" />
             <canvas ref={canvasRef} className="absolute top-0 left-0 pointer-events-none z-10" />
             
-            {/* Zoom Controls (Bottom Right) */}
             <div className="absolute bottom-16 right-4 flex flex-col gap-2 z-30 pointer-events-auto">
                 <button onClick={() => handleZoom(0.8)} className="w-10 h-10 bg-[#1e222d] text-white rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 flex items-center justify-center opacity-80 transition-opacity hover:opacity-100">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -356,6 +387,19 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 setSetupVisibility={props.setSetupVisibility}
                 onReload={props.onReload}
                 focusedEntry={props.focusedEntry}
+            />
+
+            <ReplayControls 
+                isActive={props.replayState.active}
+                isPlaying={props.replayState.playing}
+                speed={props.replayState.speed}
+                currentIndex={props.replayState.index}
+                maxIndex={props.replayState.maxIndex}
+                currentDate={props.data.length > 0 ? props.data[props.data.length-1].time as number : 0}
+                onPlayPause={props.onReplayControl.togglePlay}
+                onSpeedChange={props.onReplayControl.changeSpeed}
+                onExit={props.onReplayControl.exit}
+                onSeek={(e) => props.onReplayControl.seek(parseInt(e.target.value))}
             />
         </div>
     );

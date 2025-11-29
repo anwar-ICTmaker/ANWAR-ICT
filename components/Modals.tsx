@@ -1,4 +1,3 @@
-
 import React, { useMemo, ReactNode, Component } from 'react';
 import { EntrySignal } from '../types';
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { StructurePoint, EntrySignal } from '../../types';
 
@@ -10,9 +11,10 @@ interface ScannerPanelProps {
     onClose: () => void;
     onFocusEntry?: (e: EntrySignal) => void;
     focusedEntry?: EntrySignal | null;
+    onReplay?: (e: EntrySignal) => void;
 }
 
-export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning, onFocusEntry, focusedEntry }) => {
+export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning, onFocusEntry, focusedEntry, onReplay }) => {
     return (
         <div className="h-full flex flex-col bg-[#151924]">
             <div className="p-4 border-b border-[#2a2e39] flex justify-between items-center shrink-0">
@@ -64,6 +66,15 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                                             <div className="bg-gray-800 text-[10px] text-gray-300 px-1 rounded">
                                                 Score: {entry.score}
                                             </div>
+                                            {onReplay && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); onReplay(entry); }}
+                                                    className="p-1.5 rounded bg-gray-800 text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition-all"
+                                                    title="Replay Trade"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                                </button>
+                                            )}
                                             {onFocusEntry && (
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} 

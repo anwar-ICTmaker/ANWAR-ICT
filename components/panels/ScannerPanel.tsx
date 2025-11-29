@@ -20,7 +20,7 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                 <div className="text-xs text-gray-500 font-mono">LIVE</div>
             </div>
             
-            <div className="p-4 flex-1 overflow-y-auto">
+            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="mb-6">
                      <div className="text-xs font-bold text-gray-500 uppercase mb-2">Market Condition</div>
                      <div className="bg-[#0b0e11] p-3 rounded border border-[#2a2e39] flex justify-between items-center">
@@ -67,14 +67,12 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                                             {onFocusEntry && (
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} 
-                                                    className={`p-1.5 rounded transition-all ${isFocused ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:text-white'}`} 
+                                                    className={`p-1.5 rounded transition-all flex items-center justify-center w-7 h-7 ${isFocused ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}`} 
                                                     title={isFocused ? "Currently Focused" : "View on Chart"}
                                                 >
                                                     {isFocused ? (
-                                                        // Eye Icon (Visible/Active)
                                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                                     ) : (
-                                                        // Crosshair/Target Icon (Not focused)
                                                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
                                                     )}
                                                 </button>

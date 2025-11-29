@@ -18,15 +18,17 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
     onAssetChange, 
     onClose 
 }) => {
-    // Default stats if null or invalid
+    // Default stats to prevent undefined errors
     const stats = backtestStats || {
         totalTrades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, profitFactor: 0, maxDrawdown: 0, equityCurve: []
     };
     
-    // Safety check for NaN values to prevent render crashes
-    const safeWinRate = isNaN(stats.winRate) ? 0 : stats.winRate;
-    const safeProfitFactor = isNaN(stats.profitFactor) ? 0 : stats.profitFactor;
+    // SAFETY CHECKS: Ensure no NaN/Infinite values pass to the DOM/Styles
+    const safeWinRate = (!stats.winRate || isNaN(stats.winRate) || !isFinite(stats.winRate)) ? 0 : stats.winRate;
+    const safeProfitFactor = (!stats.profitFactor || isNaN(stats.profitFactor) || !isFinite(stats.profitFactor)) ? 0 : stats.profitFactor;
     const safeTotalTrades = stats.totalTrades || 0;
+    const safePnL = (!stats.netPnL || isNaN(stats.netPnL)) ? 0 : stats.netPnL;
+    const safeDrawdown = (!stats.maxDrawdown || isNaN(stats.maxDrawdown)) ? 0 : stats.maxDrawdown;
 
     const assets = [
         { id: 'MGC (COMEX)', label: 'Gold (Micro)', icon: '🟡' },
@@ -45,17 +47,21 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
         </div>
     );
 
-    const ProgressBar = ({ label, value, color }: { label: string, value: number, color: string }) => (
-        <div className="mb-4">
-            <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-400">{label}</span>
-                <span className="text-white font-bold">{value.toFixed(1)}%</span>
+    const ProgressBar = ({ label, value, color }: { label: string, value: number, color: string }) => {
+        // Safe percentage calculation
+        const cleanValue = Math.min(100, Math.max(0, isNaN(value) ? 0 : value));
+        return (
+            <div className="mb-4">
+                <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-400">{label}</span>
+                    <span className="text-white font-bold">{cleanValue.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
+                    <div className={`h-full ${color}`} style={{ width: `${cleanValue}%` }}></div>
+                </div>
             </div>
-            <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden">
-                <div className={`h-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }}></div>
-            </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="w-full h-full bg-[#0b0e11] overflow-y-auto custom-scrollbar">
@@ -101,9 +107,9 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
                     />
                     <MetricCard 
                         title="Net PnL" 
-                        value={`$${stats.netPnL.toLocaleString(undefined, {minimumFractionDigits: 2})}`} 
-                        subValue={stats.netPnL >= 0 ? "Profit Target: In Progress" : "Drawdown Active"} 
-                        color={stats.netPnL >= 0 ? "bg-green-500" : "bg-red-500"} 
+                        value={`$${safePnL.toLocaleString(undefined, {minimumFractionDigits: 2})}`} 
+                        subValue={safePnL >= 0 ? "Profit Target: In Progress" : "Drawdown Active"} 
+                        color={safePnL >= 0 ? "bg-green-500" : "bg-red-500"} 
                     />
                     <MetricCard 
                         title="Profit Factor" 
@@ -130,7 +136,13 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
                         </h3>
                         <div className="flex flex-col items-center justify-center mb-8">
                             <div className="relative w-40 h-40 flex items-center justify-center rounded-full border-[12px] border-[#1e222d]">
-                                <div className="absolute inset-0 rounded-full border-[12px] border-blue-500 transition-all duration-1000 ease-out" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, transform: `rotate(${(safeWinRate/100)*360}deg)`, opacity: 0.8 }}></div>
+                                <div className="absolute inset-0 rounded-full border-[12px] border-blue-500 transition-all duration-1000 ease-out" 
+                                     style={{ 
+                                         clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, 
+                                         transform: `rotate(${safeWinRate ? (safeWinRate/100)*360 : 0}deg)`, 
+                                         opacity: 0.8 
+                                     }}>
+                                </div>
                                 <div className="text-center z-10">
                                     <div className="text-3xl font-bold text-white">{safeWinRate.toFixed(0)}%</div>
                                     <div className="text-[10px] text-gray-500 uppercase tracking-wide">Efficiency</div>
@@ -165,7 +177,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({
                             </div>
                             <div className="bg-[#0b0e11] p-4 rounded-lg border border-[#2a2e39] hover:border-blue-500/30 transition-colors">
                                 <div className="text-gray-500 text-xs uppercase mb-1">Max Drawdown</div>
-                                <div className="text-red-500 font-bold font-mono text-lg">${stats.maxDrawdown.toFixed(2)}</div>
+                                <div className="text-red-500 font-bold font-mono text-lg">${safeDrawdown.toFixed(2)}</div>
                             </div>
                              <div className="bg-[#0b0e11] p-4 rounded-lg border border-[#2a2e39] hover:border-blue-500/30 transition-colors">
                                 <div className="text-gray-500 text-xs uppercase mb-1">Consistency Score</div>

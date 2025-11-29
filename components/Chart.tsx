@@ -60,14 +60,26 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         if (props.setupVisibility === 'FOCUS' && props.focusedEntry && chartRef.current && props.data.length > 0) {
             const chart = chartRef.current;
             const entryTime = props.focusedEntry.time as number;
+            const exitTime = props.focusedEntry.exitTime as number | undefined;
             
             // Find index of the entry candle
-            const index = props.data.findIndex(d => d.time === entryTime);
+            const entryIndex = props.data.findIndex(d => d.time === entryTime);
             
-            if (index !== -1) {
-                // Determine a nice range: 30 candles before, 50 candles after (to see TP/SL projection)
-                const fromIndex = Math.max(0, index - 30);
-                const toIndex = Math.min(props.data.length - 1, index + 50);
+            if (entryIndex !== -1) {
+                // Determine a nice range
+                // If trade is closed, zoom to fit the whole trade + some buffer
+                // If open, just show entry + 50 bars
+                
+                let toIndex = entryIndex + 50;
+                if (exitTime) {
+                    const exitIndex = props.data.findIndex(d => d.time === exitTime);
+                    if (exitIndex !== -1) {
+                         toIndex = exitIndex + 20; // Add buffer after exit
+                    }
+                }
+                
+                const fromIndex = Math.max(0, entryIndex - 30); // Show context before
+                toIndex = Math.min(props.data.length - 1, toIndex);
                 
                 chart.timeScale().setVisibleLogicalRange({ from: fromIndex, to: toIndex });
             }
@@ -89,17 +101,17 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         }
 
         const chart = createChart(chartContainerRef.current, {
-            layout: { background: { type: ColorType.Solid, color: '#131722' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+            layout: { background: { type: ColorType.Solid, color: '#0b0e11' }, textColor: '#848e9c' },
+            grid: { vertLines: { color: '#151924' }, horzLines: { color: '#151924' } },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
             timeScale: { timeVisible: true, secondsVisible: false },
-            rightPriceScale: { visible: true, borderColor: '#2B2B43' },
-            leftPriceScale: { visible: false, borderColor: '#2B2B43' },
+            rightPriceScale: { visible: true, borderColor: '#2a2e39' },
+            leftPriceScale: { visible: false, borderColor: '#2a2e39' },
             crosshair: {
                 mode: CrosshairMode.Normal,
-                vertLine: { labelBackgroundColor: '#2962FF' },
-                horzLine: { labelBackgroundColor: '#2962FF' },
+                vertLine: { labelBackgroundColor: '#2962FF', color: '#2a2e39' },
+                horzLine: { labelBackgroundColor: '#2962FF', color: '#2a2e39' },
             },
             handleScale: { pinch: true, mouseWheel: true, axisPressedMouseMove: true },
             handleScroll: { vertTouchDrag: false, horzTouchDrag: true, pressedMouseMove: true, mouseWheel: true },
@@ -107,7 +119,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         });
 
         const candleSeries = chart.addSeries(CandlestickSeries, {
-             upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+             upColor: '#0ecb81', downColor: '#f6465d', borderVisible: false, wickUpColor: '#0ecb81', wickDownColor: '#f6465d',
              priceFormat: { type: 'price', precision: 2, minMove: 0.01 }
         });
         
@@ -143,7 +155,10 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         
         chart.subscribeClick(param => {
             if (param.time) {
-                const e = visibleEntries.find((x: any) => x.time === param.time);
+                // Check if user clicked on an entry
+                // Find nearest entry to click time (within tolerance)
+                const clickTime = param.time as number;
+                const e = visibleEntries.find((x: any) => Math.abs(x.time - clickTime) < 300); // 5 min tolerance
                 if (e) props.onClickEntry(e);
             }
         });
@@ -205,9 +220,9 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 let color = 'transparent';
                 let value = 0;
                 if (props.overlays.killzones) {
-                    if (h >= 0 && h < 8) { color = 'rgba(255, 165, 0, 0.15)'; value = 1; }
-                    else if (h >= 7 && h < 16) { color = 'rgba(41, 98, 255, 0.15)'; value = 1; }
-                    else if (h >= 12 && h < 21) { color = 'rgba(0, 230, 118, 0.15)'; value = 1; }
+                    if (h >= 0 && h < 8) { color = 'rgba(255, 165, 0, 0.08)'; value = 1; }
+                    else if (h >= 7 && h < 16) { color = 'rgba(41, 98, 255, 0.08)'; value = 1; }
+                    else if (h >= 12 && h < 21) { color = 'rgba(0, 230, 118, 0.08)'; value = 1; }
                 }
                 return { time: d.time, value, color };
             });
@@ -218,7 +233,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 const m = new Date(d.time * 1000).getUTCMinutes();
                 let value = 0;
                 if (props.overlays.macro && (m >= 50 || m <= 10)) value = 1; 
-                return { time: d.time, value, color: value ? 'rgba(255, 215, 0, 0.15)' : 'transparent' };
+                return { time: d.time, value, color: value ? 'rgba(255, 215, 0, 0.1)' : 'transparent' };
              });
              macroSeriesRef.current.setData(mData);
         }
@@ -239,7 +254,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             if (props.overlays.swingStructure) {
                 props.structure.forEach((s: any) => {
                      if (['HH','HL','LH','LL'].includes(s.type))
-                        markers.push({ time: s.time, position: s.type.includes('H')?'aboveBar':'belowBar', color: s.type.includes('H')?'#ef5350':'#26a69a', shape: s.type.includes('H')?'arrowDown':'arrowUp', text: s.type });
+                        markers.push({ time: s.time, position: s.type.includes('H')?'aboveBar':'belowBar', color: s.type.includes('H')?'#ef5350':'#0ecb81', shape: s.type.includes('H')?'arrowDown':'arrowUp', text: s.type });
                 });
             }
             if (props.overlays.internalStructure) {
@@ -300,10 +315,14 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
             <div ref={chartContainerRef} className="flex-1 w-full h-full overflow-hidden" />
             <canvas ref={canvasRef} className="absolute top-0 left-0 pointer-events-none z-10" />
             
-            {/* Zoom Controls */}
+            {/* Zoom Controls (Bottom Right) */}
             <div className="absolute bottom-16 right-4 flex flex-col gap-2 z-30">
-                <button onClick={() => handleZoom(0.8)} className="bg-gray-800 text-white p-3 rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 opacity-80">+</button>
-                <button onClick={() => handleZoom(1.2)} className="bg-gray-800 text-white p-3 rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 opacity-80">-</button>
+                <button onClick={() => handleZoom(0.8)} className="w-10 h-10 bg-[#1e222d] text-white rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 flex items-center justify-center opacity-80 transition-opacity hover:opacity-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <button onClick={() => handleZoom(1.2)} className="w-10 h-10 bg-[#1e222d] text-white rounded-full hover:bg-gray-700 shadow-lg border border-gray-600 flex items-center justify-center opacity-80 transition-opacity hover:opacity-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
             </div>
 
             <ChartControls 

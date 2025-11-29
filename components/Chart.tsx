@@ -240,9 +240,39 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
              activeTradeLinesRef.current.forEach(l => candleSeriesRef.current?.removePriceLine(l));
              activeTradeLinesRef.current = [];
             if (props.position) {
-                activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.price, color: '#2962FF', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'ENTRY' }));
-                if (props.position.stopLoss) activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.stopLoss, color: '#ef5350', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'SL' }));
-                if (props.position.takeProfit) activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ price: props.position.takeProfit, color: '#00E676', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'TP' }));
+                // Highlighted Entry Line
+                activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
+                    price: props.position.price, 
+                    color: '#2962FF', // Bright Blue
+                    lineWidth: 3,     // Thicker for emphasis
+                    lineStyle: 0,     // Solid
+                    axisLabelVisible: true, 
+                    title: 'ENTRY' 
+                }));
+                
+                // Highlighted SL Line
+                if (props.position.stopLoss) {
+                    activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
+                        price: props.position.stopLoss, 
+                        color: '#FF1744', // Brighter Red
+                        lineWidth: 2,     // Thicker
+                        lineStyle: 2,     // Dashed
+                        axisLabelVisible: true, 
+                        title: 'SL' 
+                    }));
+                }
+                
+                // Highlighted TP Line
+                if (props.position.takeProfit) {
+                    activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
+                        price: props.position.takeProfit, 
+                        color: '#00E676', // Brighter Green
+                        lineWidth: 2,     // Thicker
+                        lineStyle: 2,     // Dashed
+                        axisLabelVisible: true, 
+                        title: 'TP' 
+                    }));
+                }
             }
             const markers: SeriesMarker<Time>[] = [];
             if (props.overlays.swingStructure) {

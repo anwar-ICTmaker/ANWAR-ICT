@@ -1,3 +1,4 @@
+
 import React, { useMemo, ReactNode, Component } from 'react';
 import { EntrySignal } from '../types';
 
@@ -104,7 +105,10 @@ interface ErrorBoundaryState {
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-    state: ErrorBoundaryState = { hasError: false };
+    constructor(props: ErrorBoundaryProps) {
+        super(props);
+        this.state = { hasError: false };
+    }
 
     static getDerivedStateFromError(error: any) {
         return { hasError: true };

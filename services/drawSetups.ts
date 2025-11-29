@@ -36,8 +36,9 @@ export const drawSetups = (
         ctx.beginPath();
         
         // Fix for roundRect TypeScript error / Browser compatibility
-        if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(drawX, y - bgH/2, bgW, bgH, 3);
+        // Cast ctx to any to avoid TS error 'Property roundRect does not exist on type CanvasRenderingContext2D'
+        if (typeof (ctx as any).roundRect === 'function') {
+            (ctx as any).roundRect(drawX, y - bgH/2, bgW, bgH, 3);
         } else {
             // Fallback for older browsers
             ctx.rect(drawX, y - bgH/2, bgW, bgH);

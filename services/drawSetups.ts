@@ -93,6 +93,35 @@ export const drawSetups = (
         const lossFill = lossColor + '0.15)';
         const lossStroke = lossColor + '0.5)';
 
+        // --- DRAW "CAUSE" LINE (Exact Entry Indicator) ---
+        // Draws a line from the entry candle to the logic level (e.g. OB High)
+        if (entry.confluenceLevel) {
+            const yConf = series.priceToCoordinate(entry.confluenceLevel);
+            if (yConf !== null) {
+                ctx.beginPath();
+                ctx.moveTo(x1, yEntry);
+                ctx.lineTo(x1 - 25, yConf); // Draw line back slightly
+                ctx.strokeStyle = isLong ? '#0ecb81' : '#f6465d';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw a small dot at the confluence price
+                ctx.beginPath();
+                ctx.arc(x1 - 25, yConf, 2, 0, Math.PI * 2);
+                ctx.fillStyle = isLong ? '#0ecb81' : '#f6465d';
+                ctx.fill();
+
+                // Small text indicating reason
+                if (x1 > 30) {
+                   ctx.fillStyle = '#848e9c';
+                   ctx.font = 'italic 9px Inter';
+                   ctx.fillText("Entry Cause", x1 - 50, yConf - 5);
+                }
+            }
+        }
+
         // Draw Profit Box
         const hTP = yTP - yEntry;
         ctx.fillStyle = profitFill;

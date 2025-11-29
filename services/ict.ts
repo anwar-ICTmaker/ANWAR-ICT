@@ -150,18 +150,37 @@ export const detectEntries = (data: CandleData[], obs: OrderBlock[], fvgs: FVG[]
         
         let score = 0;
         const confluences: string[] = [];
+        let confluenceLevel: number | undefined = undefined;
 
         const touchingBullOB = obs.find(ob => ob.direction === 'Bullish' && !ob.mitigated && candle.low <= ob.priceHigh && candle.low >= ob.priceLow && (ob.time as number) < (candle.time as number));
-        if (touchingBullOB) { score += 3; confluences.push(`Retest Bullish ${touchingBullOB.subtype === 'Breaker' ? 'Breaker' : 'OB'}`); }
+        if (touchingBullOB) { 
+            score += 3; 
+            confluences.push(`Retest Bullish ${touchingBullOB.subtype === 'Breaker' ? 'Breaker' : 'OB'}`); 
+            confluenceLevel = touchingBullOB.priceHigh;
+        }
         
         const touchingBearOB = obs.find(ob => ob.direction === 'Bearish' && !ob.mitigated && candle.high >= ob.priceLow && candle.high <= ob.priceHigh && (ob.time as number) < (candle.time as number));
-        if (touchingBearOB) { score += 3; confluences.push(`Retest Bearish ${touchingBearOB.subtype === 'Breaker' ? 'Breaker' : 'OB'}`); }
+        if (touchingBearOB) { 
+            score += 3; 
+            confluences.push(`Retest Bearish ${touchingBearOB.subtype === 'Breaker' ? 'Breaker' : 'OB'}`); 
+            confluenceLevel = touchingBearOB.priceLow;
+        }
         
         const touchingBullFVG = fvgs.find(f => f.direction === 'Bullish' && candle.low <= f.priceHigh && candle.low >= f.priceLow && (f.time as number) < (candle.time as number));
-        if (touchingBullFVG) { score += 2; confluences.push('Discount FVG'); if (touchingBullFVG.isSilverBullet) { score += 4; confluences.push('Silver Bullet Zone'); } }
+        if (touchingBullFVG) { 
+            score += 2; 
+            confluences.push('Discount FVG'); 
+            if (!confluenceLevel) confluenceLevel = touchingBullFVG.priceHigh;
+            if (touchingBullFVG.isSilverBullet) { score += 4; confluences.push('Silver Bullet Zone'); } 
+        }
         
         const touchingBearFVG = fvgs.find(f => f.direction === 'Bearish' && candle.high >= f.priceLow && candle.high <= f.priceHigh && (f.time as number) < (candle.time as number));
-        if (touchingBearFVG) { score += 2; confluences.push('Premium FVG'); if (touchingBearFVG.isSilverBullet) { score += 4; confluences.push('Silver Bullet Zone'); } }
+        if (touchingBearFVG) { 
+            score += 2; 
+            confluences.push('Premium FVG'); 
+            if (!confluenceLevel) confluenceLevel = touchingBearFVG.priceLow;
+            if (touchingBearFVG.isSilverBullet) { score += 4; confluences.push('Silver Bullet Zone'); } 
+        }
         
         const hour = new Date((candle.time as number) * 1000).getUTCHours();
         const session = getSession(hour);
@@ -183,7 +202,9 @@ export const detectEntries = (data: CandleData[], obs: OrderBlock[], fvgs: FVG[]
                     tradingStyle: isScalping ? 'SCALP' : 'DAY_TRADE',
                     po3Phase: po3,
                     setupName,
-                    setupGrade
+                    setupGrade,
+                    confluenceLevel,
+                    timeframe
                  });
                  lastSignalTime = candle.time as number;
             } else if (!isBullish && (touchingBearOB || touchingBearFVG)) {
@@ -197,7 +218,9 @@ export const detectEntries = (data: CandleData[], obs: OrderBlock[], fvgs: FVG[]
                     tradingStyle: isScalping ? 'SCALP' : 'DAY_TRADE',
                     po3Phase: po3,
                     setupName,
-                    setupGrade
+                    setupGrade,
+                    confluenceLevel,
+                    timeframe
                  });
                  lastSignalTime = candle.time as number;
             }

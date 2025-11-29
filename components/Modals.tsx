@@ -1,4 +1,4 @@
-import React, { useMemo, ReactNode, Component } from 'react';
+import React, { useMemo, ReactNode } from 'react';
 import { EntrySignal } from '../types';
 
 export const EntryDetailModal = ({ entry, onClose }: { entry: EntrySignal, onClose: () => void }) => (
@@ -103,9 +103,7 @@ interface ErrorBoundaryState {
     hasError: boolean;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-    public state: ErrorBoundaryState = { hasError: false };
-
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
     constructor(props: ErrorBoundaryProps) {
         super(props);
         this.state = { hasError: false };

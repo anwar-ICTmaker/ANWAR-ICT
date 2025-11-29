@@ -74,6 +74,8 @@ export interface EntrySignal {
     exitTime?: UTCTimestamp;
     setupName?: string;
     setupGrade?: string;
+    confluenceLevel?: number; // The exact price level (OB/FVG) that triggered the entry
+    timeframe?: string;       // The timeframe this setup was detected on
 }
 
 export interface BacktestStats {

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
     createChart, 
@@ -59,17 +58,21 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     // Zoom to focused entry effect
     useEffect(() => {
         if (props.setupVisibility === 'FOCUS' && props.focusedEntry && chartRef.current && props.data.length > 0) {
-            const ts = chartRef.current.timeScale();
+            const chart = chartRef.current;
             const entryTime = props.focusedEntry.time as number;
+            
+            // Find index of the entry candle
             const index = props.data.findIndex(d => d.time === entryTime);
+            
             if (index !== -1) {
-                // Zoom to +/- 30 candles around entry
+                // Determine a nice range: 30 candles before, 50 candles after (to see TP/SL projection)
                 const fromIndex = Math.max(0, index - 30);
-                const toIndex = Math.min(props.data.length - 1, index + 30);
-                ts.setVisibleLogicalRange({ from: fromIndex, to: toIndex });
+                const toIndex = Math.min(props.data.length - 1, index + 50);
+                
+                chart.timeScale().setVisibleLogicalRange({ from: fromIndex, to: toIndex });
             }
         }
-    }, [props.focusedEntry, props.setupVisibility]); 
+    }, [props.focusedEntry, props.setupVisibility, props.data]); 
 
     // Initialize Chart
     useEffect(() => {
@@ -175,17 +178,24 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
     useEffect(() => {
         if (candleSeriesRef.current && props.data.length > 0) {
              const coloredData = props.data.map((d: any) => {
+                // Highlight focused entry candle
+                const isFocused = props.setupVisibility === 'FOCUS' && props.focusedEntry && d.time === props.focusedEntry.time;
                 const isEntry = visibleEntries.find((e: any) => e.time === d.time);
                 const hour = new Date(d.time * 1000).getUTCHours();
                 const isSB = (hour === 14 || hour === 9 || hour === 3);
-                let color = undefined; let borderColor = undefined;
-                if (isEntry && isEntry.score >= 7) { color = '#FFFF00'; borderColor = '#FFFF00'; }
+                
+                let color = undefined; 
+                let borderColor = undefined;
+
+                if (isFocused) { color = '#ffffff'; borderColor = '#ffffff'; }
+                else if (isEntry && isEntry.score >= 7) { color = '#FFFF00'; borderColor = '#FFFF00'; }
                 else if (isSB && props.overlays.silverBullet) { borderColor = '#FFD700'; }
+                
                 return { ...d, color, borderColor };
             });
             candleSeriesRef.current.setData(coloredData);
         }
-    }, [props.data, visibleEntries, props.overlays]);
+    }, [props.data, visibleEntries, props.overlays, props.focusedEntry, props.setupVisibility]);
 
     // Update Sessions & Macro
     useEffect(() => {
@@ -214,7 +224,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         }
     }, [props.data, props.overlays]);
 
-    // Update Markers & Trade Lines (Active Position Only)
+    // Update Markers & Trade Lines
     useEffect(() => {
         if (!candleSeriesRef.current) return;
         try {
@@ -239,7 +249,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                         markers.push({ time: s.time, position: s.type.includes('BOS') ? (s.direction==='Bullish'?'belowBar':'aboveBar') : 'aboveBar', color: s.type==='BOS'?'#2962FF':'#E040FB', shape: 'none', text: s.type });
                 });
             }
-            if (props.overlays.backtestMarkers) {
+            if (props.overlays.backtestMarkers && props.setupVisibility !== 'NONE') {
                 visibleEntries.forEach((e: any) => {
                     const grade = e.setupGrade ? `[${e.setupGrade}] ` : '';
                     // @ts-ignore
@@ -251,7 +261,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
 
         } catch (err) { console.warn("Error updating chart markers/lines:", err); }
         requestAnimationFrame(drawCanvasOverlay);
-    }, [props.position, props.structure, visibleEntries, props.overlays, props.data]);
+    }, [props.position, props.structure, visibleEntries, props.overlays, props.data, props.setupVisibility]);
 
     // Canvas Overlay Drawing
     const drawCanvasOverlay = useCallback(() => {
@@ -302,6 +312,7 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
                 setupVisibility={props.setupVisibility}
                 setSetupVisibility={props.setSetupVisibility}
                 onReload={props.onReload}
+                focusedEntry={props.focusedEntry}
             />
         </div>
     );

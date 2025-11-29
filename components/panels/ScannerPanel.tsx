@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { StructurePoint, EntrySignal } from '../../types';
 
@@ -10,9 +9,10 @@ interface ScannerPanelProps {
     isScanning?: boolean;
     onClose: () => void;
     onFocusEntry?: (e: EntrySignal) => void;
+    focusedEntry?: EntrySignal | null;
 }
 
-export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning, onFocusEntry }) => {
+export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, setClickedEntry, onDeepScan, isScanning, onFocusEntry, focusedEntry }) => {
     return (
         <div className="h-full flex flex-col bg-[#151924]">
             <div className="p-4 border-b border-[#2a2e39] flex justify-between items-center shrink-0">
@@ -47,34 +47,47 @@ export const ScannerPanel: React.FC<ScannerPanelProps> = ({ structure, entries, 
                         <span>{entries.length} Total</span>
                     </div>
                     <div className="space-y-2">
-                        {entries.slice(-10).reverse().map((entry, i) => (
-                            <div key={i} className="group p-3 bg-[#0b0e11] rounded border border-[#2a2e39] hover:border-blue-500 transition-colors">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => setClickedEntry(entry)}>
-                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${entry.type === 'LONG' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-                                            {entry.type}
-                                        </span>
-                                        <span className="text-xs text-gray-500 font-mono">
-                                            {new Date(entry.time as number * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="bg-gray-800 text-[10px] text-gray-300 px-1 rounded">
-                                            Score: {entry.score}
+                        {entries.slice(-10).reverse().map((entry, i) => {
+                            const isFocused = focusedEntry && entry.time === focusedEntry.time;
+                            return (
+                                <div key={i} className={`group p-3 bg-[#0b0e11] rounded border transition-colors ${isFocused ? 'border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.2)] bg-blue-900/10' : 'border-[#2a2e39] hover:border-blue-500'}`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setClickedEntry(entry)}>
+                                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${entry.type === 'LONG' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                                                {entry.type}
+                                            </span>
+                                            <span className="text-xs text-gray-500 font-mono">
+                                                {new Date(entry.time as number * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                            </span>
                                         </div>
-                                        {onFocusEntry && (
-                                            <button onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} className="text-gray-500 hover:text-white p-1" title="View on Chart">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                            </button>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <div className="bg-gray-800 text-[10px] text-gray-300 px-1 rounded">
+                                                Score: {entry.score}
+                                            </div>
+                                            {onFocusEntry && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); onFocusEntry(entry); }} 
+                                                    className={`p-1.5 rounded transition-all ${isFocused ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-800 text-gray-400 hover:text-white'}`} 
+                                                    title={isFocused ? "Currently Focused" : "View on Chart"}
+                                                >
+                                                    {isFocused ? (
+                                                        // Eye Icon (Visible/Active)
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                                    ) : (
+                                                        // Crosshair/Target Icon (Not focused)
+                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+                                                    )}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center cursor-pointer" onClick={() => setClickedEntry(entry)}>
+                                        <span className="text-xs text-gray-300 font-medium truncate w-24" title={entry.setupName}>{entry.setupName || 'Standard Setup'}</span>
+                                        {entry.setupGrade && <span className={`text-[10px] font-bold px-1 rounded ${entry.setupGrade.includes('A') ? 'text-yellow-400' : 'text-gray-500'}`}>{entry.setupGrade}</span>}
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center cursor-pointer" onClick={() => setClickedEntry(entry)}>
-                                    <span className="text-xs text-gray-300 font-medium truncate w-24" title={entry.setupName}>{entry.setupName || 'Standard Setup'}</span>
-                                    {entry.setupGrade && <span className={`text-[10px] font-bold px-1 rounded ${entry.setupGrade.includes('A') ? 'text-yellow-400' : 'text-gray-500'}`}>{entry.setupGrade}</span>}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                         {entries.length === 0 && <div className="text-center text-gray-600 text-xs py-4">No setups detected in current range</div>}
                     </div>
                 </div>

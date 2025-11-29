@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BacktestStats, TradeEntry } from '../../types';
 
@@ -6,14 +5,36 @@ interface DashboardPanelProps {
     balance: number;
     backtestStats: BacktestStats | null;
     position: TradeEntry | null;
-    onClose?: () => void; // Optional now as it is a main view
+    currentAsset: string;
+    onAssetChange: (asset: string) => void;
+    onClose?: () => void;
 }
 
-export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtestStats, position, onClose }) => {
-    // Default stats if null
+export const DashboardPanel: React.FC<DashboardPanelProps> = ({ 
+    balance, 
+    backtestStats, 
+    position, 
+    currentAsset, 
+    onAssetChange, 
+    onClose 
+}) => {
+    // Default stats if null or invalid
     const stats = backtestStats || {
         totalTrades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, profitFactor: 0, maxDrawdown: 0, equityCurve: []
     };
+    
+    // Safety check for NaN values to prevent render crashes
+    const safeWinRate = isNaN(stats.winRate) ? 0 : stats.winRate;
+    const safeProfitFactor = isNaN(stats.profitFactor) ? 0 : stats.profitFactor;
+    const safeTotalTrades = stats.totalTrades || 0;
+
+    const assets = [
+        { id: 'MGC (COMEX)', label: 'Gold (Micro)', icon: '🟡' },
+        { id: 'BTCUSDT', label: 'Bitcoin', icon: '₿' },
+        { id: 'ETHUSDT', label: 'Ethereum', icon: '⟠' },
+        { id: 'SOLUSDT', label: 'Solana', icon: '◎' },
+        { id: 'EURUSDT', label: 'Euro', icon: '€' }
+    ];
 
     const MetricCard = ({ title, value, subValue, color }: { title: string, value: string, subValue?: string, color: string }) => (
         <div className="bg-[#1e222d] p-5 rounded-lg border border-gray-800 shadow-sm relative overflow-hidden group hover:border-gray-600 transition-all">
@@ -40,16 +61,34 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtes
         <div className="w-full h-full bg-[#0b0e11] overflow-y-auto custom-scrollbar">
             <div className="max-w-7xl mx-auto p-6 md:p-8">
                 {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-6 border-b border-[#2a2e39] gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-6 border-b border-[#2a2e39] gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-white mb-2">Trading Dashboard</h1>
-                        <p className="text-gray-500 text-sm">Real-time performance metrics and account analysis.</p>
+                        <p className="text-gray-500 text-sm">Real-time performance metrics for <span className="text-blue-400 font-bold">{currentAsset}</span>.</p>
                     </div>
                     {/* Date/Status Pill */}
                     <div className="bg-[#151924] border border-[#2a2e39] rounded-full px-4 py-1.5 flex items-center gap-2">
                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                          <span className="text-xs font-bold text-gray-300">SYSTEM ONLINE</span>
                     </div>
+                </div>
+
+                {/* ASSET SUBMENU */}
+                <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 scrollbar-hide">
+                    {assets.map(asset => (
+                        <button
+                            key={asset.id}
+                            onClick={() => onAssetChange(asset.id)}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${
+                                currentAsset === asset.id 
+                                ? 'bg-blue-600/10 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]' 
+                                : 'bg-[#151924] border-[#2a2e39] text-gray-400 hover:text-white hover:border-gray-500 hover:bg-[#1e222d]'
+                            }`}
+                        >
+                            <span className="text-base">{asset.icon}</span>
+                            {asset.label}
+                        </button>
+                    ))}
                 </div>
 
                 {/* Top Metrics Grid */}
@@ -68,13 +107,13 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtes
                     />
                     <MetricCard 
                         title="Profit Factor" 
-                        value={stats.profitFactor.toFixed(2)} 
+                        value={safeProfitFactor.toFixed(2)} 
                         subValue="Target: > 1.5" 
                         color="bg-purple-500" 
                     />
                     <MetricCard 
                         title="Win Rate" 
-                        value={`${stats.winRate.toFixed(1)}%`} 
+                        value={`${safeWinRate.toFixed(1)}%`} 
                         subValue={`${stats.wins}W - ${stats.losses}L`} 
                         color="bg-yellow-500" 
                     />
@@ -91,16 +130,16 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtes
                         </h3>
                         <div className="flex flex-col items-center justify-center mb-8">
                             <div className="relative w-40 h-40 flex items-center justify-center rounded-full border-[12px] border-[#1e222d]">
-                                <div className="absolute inset-0 rounded-full border-[12px] border-blue-500 transition-all duration-1000 ease-out" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, transform: `rotate(${(stats.winRate/100)*360}deg)`, opacity: 0.8 }}></div>
+                                <div className="absolute inset-0 rounded-full border-[12px] border-blue-500 transition-all duration-1000 ease-out" style={{ clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%)`, transform: `rotate(${(safeWinRate/100)*360}deg)`, opacity: 0.8 }}></div>
                                 <div className="text-center z-10">
-                                    <div className="text-3xl font-bold text-white">{stats.winRate.toFixed(0)}%</div>
+                                    <div className="text-3xl font-bold text-white">{safeWinRate.toFixed(0)}%</div>
                                     <div className="text-[10px] text-gray-500 uppercase tracking-wide">Efficiency</div>
                                 </div>
                             </div>
                         </div>
                         <div className="space-y-6">
-                             <ProgressBar label="Winning Trades" value={stats.winRate} color="bg-blue-500" />
-                             <ProgressBar label="Losing Trades" value={100 - stats.winRate} color="bg-red-500" />
+                             <ProgressBar label="Winning Trades" value={safeWinRate} color="bg-blue-500" />
+                             <ProgressBar label="Losing Trades" value={100 - safeWinRate} color="bg-red-500" />
                         </div>
                     </div>
 
@@ -108,7 +147,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtes
                     <div className="bg-[#151924] p-6 rounded-xl border border-[#2a2e39] col-span-1 lg:col-span-2 shadow-lg flex flex-col">
                          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                            Key Performance Indicators
+                            Key Performance Indicators ({currentAsset})
                          </h3>
                          
                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-auto">
@@ -134,7 +173,7 @@ export const DashboardPanel: React.FC<DashboardPanelProps> = ({ balance, backtes
                             </div>
                              <div className="bg-[#0b0e11] p-4 rounded-lg border border-[#2a2e39] hover:border-blue-500/30 transition-colors">
                                 <div className="text-gray-500 text-xs uppercase mb-1">Total Trades</div>
-                                <div className="text-blue-400 font-bold font-mono text-lg">{stats.totalTrades}</div>
+                                <div className="text-blue-400 font-bold font-mono text-lg">{safeTotalTrades}</div>
                             </div>
                          </div>
                          

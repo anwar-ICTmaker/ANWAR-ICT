@@ -220,6 +220,8 @@ const App: React.FC = () => {
                             balance={balance} 
                             backtestStats={backtestStats} 
                             position={position} 
+                            currentAsset={asset}
+                            onAssetChange={setAsset}
                         />
                     ) : (
                         /* CHART VIEW */
@@ -283,6 +285,7 @@ const App: React.FC = () => {
                             simulation={simulation} setSimulation={setSimulation}
                             onDeepScan={handleDeepScan} isScanning={isScanning}
                             onFocusEntry={handleFocusEntry}
+                            focusedEntry={focusedEntry}
                         />
                     </aside>
                 )}
@@ -324,6 +327,7 @@ const App: React.FC = () => {
                         simulation={simulation} setSimulation={setSimulation}
                         onDeepScan={handleDeepScan} isScanning={isScanning}
                         onFocusEntry={handleFocusEntry}
+                        focusedEntry={focusedEntry}
                     />
                  </div>
             </div>

@@ -33,6 +33,7 @@ interface PanelProps {
     onDeepScan: () => void;
     isScanning: boolean;
     onFocusEntry?: (e: EntrySignal) => void;
+    focusedEntry?: EntrySignal | null;
 }
 
 export const Panels: React.FC<PanelProps> = (props) => {
@@ -50,6 +51,7 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 onDeepScan={props.onDeepScan} 
                 isScanning={props.isScanning} 
                 onFocusEntry={props.onFocusEntry}
+                focusedEntry={props.focusedEntry}
                 {...commonProps}
             />;
         case 'TRADING':
@@ -70,6 +72,7 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 recentHistory={props.recentHistory} 
                 setClickedEntry={props.setClickedEntry} 
                 onFocusEntry={props.onFocusEntry}
+                focusedEntry={props.focusedEntry}
                 {...commonProps}
             /> : <div className="p-4 text-center">Loading Stats...</div>;
         case 'SETUPS': 

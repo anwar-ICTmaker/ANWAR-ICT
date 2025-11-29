@@ -1,4 +1,3 @@
-
 import { ISeriesApi, ITimeScaleApi, Time } from "lightweight-charts";
 import { CandleData, EntrySignal, FVG, OrderBlock, OverlayState, ColorTheme, UTCTimestamp } from "../types";
 import { drawSetups } from "./drawSetups";
@@ -111,8 +110,10 @@ export const drawCanvasLayer = (
     }
 
     // --- 4. TRADE SETUPS (ENTRY/SL/TP BOXES) ---
-    // Delegate to dedicated drawing function
-    if (overlays.historicalTradeLines) {
+    // Always draw if historicalTradeLines is true.
+    // The "entries" array passed here is already filtered by the visibility logic in Chart.tsx
+    // (It will contain only the focused entry if in FOCUS mode, or all entries if ALL mode)
+    if (overlays.historicalTradeLines && entries.length > 0) {
         drawSetups(ctx, timeScale, series, data, entries, true, width);
     }
 };

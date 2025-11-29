@@ -93,7 +93,9 @@ export const drawSetups = (
         if (yEntry === null || ySL === null || yTP === null) return;
 
         const isLong = entry.type === 'LONG';
-        const winColor = 'rgba(14, 203, 129, '; // Green
+        
+        // NEW COLOR: Blue for Profit to separate from Green candles
+        const winColor = 'rgba(41, 98, 255, '; // Neon Blue #2962FF
         const lossColor = 'rgba(246, 70, 93, '; // Red
         
         // Colors
@@ -172,10 +174,10 @@ export const drawSetups = (
             // Risk/Reward Ratio Pill
             drawLabel(`R:R ${rr.toFixed(1)}`, x1 + boxWidth/2, yEntry, '#000000', 'center', '#e0e0e0');
 
-            // TP Label
+            // TP Label (Blue Theme)
             if (Math.abs(hTP) > 20) {
                 const tpPct = ((Math.abs(entry.price - entry.tp) / entry.price) * 100).toFixed(2);
-                drawLabel(`Target: ${tpPct}%`, x1 + boxWidth/2, yTP + (isLong ? 12 : -12), '#0ecb81', 'center', '#1e222d');
+                drawLabel(`Target: ${tpPct}%`, x1 + boxWidth/2, yTP + (isLong ? 12 : -12), '#2962FF', 'center', '#1e222d');
             }
 
             // SL Label
@@ -191,7 +193,8 @@ export const drawSetups = (
              ctx.font = '14px Inter';
              ctx.textAlign = 'left';
              ctx.textBaseline = 'middle';
-             ctx.fillStyle = isWin ? '#0ecb81' : '#f6465d';
+             // PnL Text Color matching the Box
+             ctx.fillStyle = isWin ? '#2962FF' : '#f6465d';
              const icon = isWin ? '✅' : '❌';
              const pnlText = entry.backtestPnL ? ` $${Math.abs(entry.backtestPnL).toFixed(0)}` : '';
              ctx.fillText(icon + pnlText, x2 + 5, yEntry);

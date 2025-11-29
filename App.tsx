@@ -8,6 +8,7 @@ import { ChartComponent } from './components/Chart';
 import { EntryDetailModal, TopSetupsModal, ToastNotification, ErrorBoundary } from './components/Modals';
 import { Panels } from './components/Panels';
 import { DashboardPanel } from './components/panels/DashboardPanel';
+import { StatsPanel } from './components/panels/StatsPanel';
 
 // Icons
 const ChartIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>;
@@ -45,14 +46,15 @@ const App: React.FC = () => {
     const [replayDateInput, setReplayDateInput] = useState('');
 
     // Visibility & Focus State
-    const [setupVisibility, setSetupVisibility] = useState<'ALL'|'FOCUS'|'NONE'>('ALL');
+    // Default to 'NONE' to keep setups hidden by default
+    const [setupVisibility, setSetupVisibility] = useState<'ALL'|'FOCUS'|'NONE'>('NONE');
     const [focusedEntry, setFocusedEntry] = useState<EntrySignal | null>(null);
 
     // Configuration
     const [overlays, setOverlays] = useState({
         obs: true, fvgs: true, killzones: true, silverBullet: true, pdZones: true,
         internalStructure: true, swingStructure: true, mtf: true, backtestMarkers: true,
-        macro: true, historicalTradeLines: true
+        macro: true, historicalTradeLines: false // Default to false
     });
     const [colors, setColors] = useState({ obBull: '#00E676', obBear: '#FF1744', fvgBull: '#00BCD4', fvgBear: '#2962FF' });
     const [config, setConfig] = useState({ swingLength: 5, obThreshold: 1.2, fvgExtend: 10 });
@@ -225,7 +227,7 @@ const App: React.FC = () => {
     const handleFocusEntry = (entry: EntrySignal) => {
         setFocusedEntry(entry);
         setSetupVisibility('FOCUS');
-        if (activeTab === 'DASHBOARD') setActiveTab('CHART');
+        if (activeTab === 'DASHBOARD' || activeTab === 'STATS') setActiveTab('CHART');
     };
 
     const thirtyDaysAgoTimestamp = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
@@ -235,8 +237,8 @@ const App: React.FC = () => {
 
     // --- LAYOUT LOGIC ---
     const isDashboard = activeTab === 'DASHBOARD';
-    // Sidebar panels are active if tab is NOT Dashboard, NOT Chart, and NOT Backtest
-    const isSidebarPanelOpen = !['DASHBOARD', 'CHART', 'BACKTEST'].includes(activeTab);
+    // Sidebar panels are active if tab is NOT Dashboard, NOT Chart, NOT Backtest, and NOT Stats
+    const isSidebarPanelOpen = !['DASHBOARD', 'CHART', 'BACKTEST', 'STATS'].includes(activeTab);
 
     // --- RENDER HELPERS ---
     const SideNavItem = ({ icon, label, id }: { icon: any, label: string, id: string }) => (
@@ -244,6 +246,9 @@ const App: React.FC = () => {
             {icon}
         </button>
     );
+
+    // Safety fallback for stats
+    const safeStats = backtestStats || {totalTrades:0, wins:0, losses:0, winRate:0, netPnL:0, profitFactor:0, maxDrawdown:0, equityCurve:[]};
 
     return (
         <div className="flex flex-col h-screen bg-[#0b0e11] text-[#e1e3e6] font-sans overflow-hidden">
@@ -308,6 +313,16 @@ const App: React.FC = () => {
                             position={position} 
                             currentAsset={asset}
                             onAssetChange={setAsset}
+                        />
+                    ) : activeTab === 'STATS' ? (
+                        /* STATS / TRADE HISTORY PAGE */
+                        <StatsPanel 
+                            backtestStats={safeStats} 
+                            recentHistory={recentHistory} 
+                            setClickedEntry={setClickedEntry} 
+                            onFocusEntry={handleFocusEntry}
+                            focusedEntry={focusedEntry}
+                            onReplay={handleStartReplay}
                         />
                     ) : activeTab === 'BACKTEST' ? (
                         /* BACKTEST / REPLAY VIEW */
@@ -422,7 +437,7 @@ const App: React.FC = () => {
                     )}
                 </main>
 
-                {/* RIGHT SIDEBAR (Tools) - Only visible when not in Dashboard/Backtest/Pure Chart mode */}
+                {/* RIGHT SIDEBAR (Tools) - Only visible when not in Dashboard/Backtest/Chart/Stats mode */}
                 {isSidebarPanelOpen && (
                     <aside className="hidden md:flex w-[320px] bg-[#151924] border-l border-[#2a2e39] flex-col z-30 shadow-xl">
                         <Panels 
@@ -465,7 +480,7 @@ const App: React.FC = () => {
                 </button>
             </nav>
 
-            {/* MOBILE PANEL DRAWER (Scanner/Stats/Trading overlay on mobile) */}
+            {/* MOBILE PANEL DRAWER (Scanner/Trading overlay on mobile) */}
             <div className={`md:hidden fixed inset-0 z-50 bg-[#0b0e11] transform transition-transform duration-300 flex flex-col ${isSidebarPanelOpen ? 'translate-y-0' : 'translate-y-full'}`}>
                  <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-[#151924]">
                     <h2 className="font-bold text-lg text-white">{activeTab}</h2>

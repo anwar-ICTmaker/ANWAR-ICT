@@ -287,21 +287,39 @@ export const ChartComponent: React.FC<ChartProps> = (props) => {
         try {
              activeTradeLinesRef.current.forEach(l => candleSeriesRef.current?.removePriceLine(l));
              activeTradeLinesRef.current = [];
-            if (props.position) {
+            
+             if (props.position) {
+                // Enhanced visibility for active trade: Thicker lines and Neon colors
                 activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                    price: props.position.price, color: '#2962FF', lineWidth: 3, lineStyle: 0, axisLabelVisible: true, title: 'ENTRY' 
+                    price: props.position.price, 
+                    color: '#00B0FF', // Neon Blue
+                    lineWidth: 4, 
+                    lineStyle: 0, // Solid
+                    axisLabelVisible: true, 
+                    title: 'ENTRY' 
                 }));
                 if (props.position.stopLoss) {
                     activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                        price: props.position.stopLoss, color: '#FF1744', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: 'SL' 
+                        price: props.position.stopLoss, 
+                        color: '#FF3D00', // Neon Red/Orange
+                        lineWidth: 3, 
+                        lineStyle: 2, // Dashed
+                        axisLabelVisible: true, 
+                        title: 'SL' 
                     }));
                 }
                 if (props.position.takeProfit) {
                     activeTradeLinesRef.current.push(candleSeriesRef.current.createPriceLine({ 
-                        price: props.position.takeProfit, color: '#00E676', lineWidth: 2, lineStyle: 2, axisLabelVisible: true, title: 'TP' 
+                        price: props.position.takeProfit, 
+                        color: '#00E676', // Neon Green
+                        lineWidth: 3, 
+                        lineStyle: 2, // Dashed
+                        axisLabelVisible: true, 
+                        title: 'TP' 
                     }));
                 }
             }
+
             const markers: SeriesMarker<Time>[] = [];
             
             // Only draw structure if within replay time

@@ -3,7 +3,6 @@ import React from 'react';
 import { AppConfig, BacktestStats, ColorTheme, EntrySignal, OrderBlock, OverlayState, StructurePoint, TradeEntry, SimulationConfig } from '../types';
 import { ScannerPanel } from './panels/ScannerPanel';
 import { TradingPanel } from './panels/TradingPanel';
-import { StatsPanel } from './panels/StatsPanel';
 import { SetupsPanel } from './panels/SetupsPanel';
 import { SettingsPanel } from './panels/SettingsPanel';
 
@@ -38,8 +37,8 @@ interface PanelProps {
 }
 
 export const Panels: React.FC<PanelProps> = (props) => {
-    // If on chart or empty, show nothing in the panel container
-    if (props.activeTab === 'CHART' || props.activeTab === 'DASHBOARD' || !props.activeTab) return null;
+    // If on main page tabs, show nothing in the panel container
+    if (['CHART', 'DASHBOARD', 'BACKTEST', 'STATS'].includes(props.activeTab) || !props.activeTab) return null;
 
     const commonProps = { onClose: () => props.setActiveTab('CHART') };
 
@@ -68,16 +67,6 @@ export const Panels: React.FC<PanelProps> = (props) => {
                 autoTrade={props.autoTrade} setAutoTrade={props.setAutoTrade} 
                 {...commonProps}
             />;
-        case 'STATS':
-            return props.backtestStats ? <StatsPanel 
-                backtestStats={props.backtestStats} 
-                recentHistory={props.recentHistory} 
-                setClickedEntry={props.setClickedEntry} 
-                onFocusEntry={props.onFocusEntry}
-                focusedEntry={props.focusedEntry}
-                onReplay={props.onReplay}
-                {...commonProps}
-            /> : <div className="p-4 text-center">Loading Stats...</div>;
         case 'SETUPS': 
             return <SetupsPanel 
                 obs={props.obs} 
